@@ -32,6 +32,7 @@
         }
     },
     "require": {
+        "php": "^8.4",
         "league/route": "^6.2",
         "laminas/laminas-diactoros": "^3.6",
         "power-modules/framework": "^1.0"
