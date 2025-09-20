@@ -1,37 +1,48 @@
 # Power Modules Router
 
-A sophisticated modular routing component for the Power Modules framework that brings **true module encapsulation** to web routing. Each module manages its own routes and middleware while maintaining complete isolation through dedicated dependency injection containers.
+[![CI](https://github.com/power-modules/router/actions/workflows/php.yml/badge.svg)](https://github.com/power-modules/router/actions/workflows/php.yml)
+[![Packagist Version](https://img.shields.io/packagist/v/power-modules/router)](https://packagist.org/packages/power-modules/router)
+[![PHP Version](https://img.shields.io/packagist/php-v/power-modules/router)](https://packagist.org/packages/power-modules/router)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![PHPStan](https://img.shields.io/badge/PHPStan-level%208-blue)](#)
+
+A modular router component for the Power Modules framework that brings true module encapsulation to HTTP routing. Each module defines its own routes and middleware while controllers and middleware are resolved from their module-specific DI containers.
+
+## Stability
+
+This project is early production-ready. It’s designed and tested for small-to-medium applications; broader-scale validation is ongoing. Interfaces may evolve with feedback.
 
 ## 🚀 Key Innovations
 
-- **🎯 Module-Centric Routing**: Routes are automatically organized and prefixed by module name—no more manual route group management
-- **🔒 True Encapsulation**: Controllers and middleware are resolved from their originating module's DI container, ensuring complete separation of concerns
-- **⚡ Zero-Configuration Setup**: Just implement `HasRoutes` and the framework handles the rest—automatic route discovery, prefixing, and registration
-- **🛡️ Type-Safe Middleware**: Both route-level and module-level middleware with full PSR-15 compliance and intelligent resolution
-- **🔧 Battle-Tested Foundation**: Built on League/Route with enhanced modular capabilities for enterprise-scale applications
+- 🎯 Module-Centric Routing: automatic route grouping and prefixing per module (kebab-case from module name)
+- 🔒 True Encapsulation: controllers and middleware resolve from the originating module’s DI container
+- ⚙️ Zero-Config Module Setup: implement `HasRoutes` and the framework wires everything during setup
+- 🛡️ PSR-Friendly: PSR-7/15/17 aligned, built on League/Route
+- 🧰 Response Decorators: add global response transformations via strategy decorators
 
 ## 🎯 Perfect For
 
-- **🏢 Modular Monoliths**: Organize complex applications with clear routing boundaries between modules
-- **📦 Plugin Systems**: Each module can define its own routes without conflicts or manual coordination
-- **🚀 API Development**: Clean separation of concerns with module-based endpoint organization
-- **👥 Team Collaboration**: Different teams can work independently on isolated routing logic
-- **🔄 Microservice Preparation**: Routes are already module-isolated, making service extraction effortless
+- 🏢 Modular Monoliths: maintain clear routing boundaries as applications grow
+- 🧩 Plugin Architectures: let modules ship self-contained routes and middleware
+- 🚀 APIs: clean separation of concerns with module-owned endpoints
+- 👥 Teams: independent development within isolated module containers
 
 ## How It Works
 
-The router extends the Power Modules framework's **module encapsulation principle** to web routing. Each module that implements `HasRoutes` becomes a self-contained routing unit with automatic organization and dependency injection.
+The router applies the framework’s module encapsulation principles to routing:
 
-- **🔄 Automatic Route Discovery**: The framework scans modules for the `HasRoutes` interface and automatically registers their routes
-- **📁 Smart Route Prefixing**: Module names are converted to kebab-case route prefixes (e.g., `UserManagementModule` → `/user-management/`)
-- **🎛️ Custom Prefixes**: Override automatic prefixing by implementing `HasCustomRouteSlug` for complete control
-- **🔗 Container Resolution**: Controllers and middleware are resolved from their module's DI container, maintaining strict encapsulation
+- Automatic route discovery: modules implementing `HasRoutes` are detected during application setup
+- Route grouping and prefixing:
+  - Default: module class name (without “Module” suffix) is converted to kebab-case
+  - Example: `UserManagementModule` → `/user-management`
+  - Custom: implement `HasCustomRouteSlug` to return a custom leading-slash prefix (recommended no trailing slash)
+- Dependency resolution:
+  - Controllers are registered with a container-aware instance resolver so they resolve from their module container
+  - Middleware resolution precedence: router container → module container → new instance (validated to implement PSR-15)
 
-This approach ensures that routing logic stays within module boundaries, making your application truly modular and maintainable.
+Under the hood, the router wraps League/Route and configures a Strategy (default: `ApplicationStrategy`) which you can override via configuration.
 
 ## Installation
-
-Install via Composer:
 
 ```sh
 composer require power-modules/router
@@ -39,409 +50,144 @@ composer require power-modules/router
 
 ## Requirements
 
-- **PHP**: 8.4+
-- **[Power Modules Framework](https://github.com/power-modules/framework)**: ^1.0
-- **League/Route**: ^6.2
+- PHP: 8.4+
+- Framework: [power-modules/framework](https://github.com/power-modules/framework) ^1.0
+- Router engine: [league/route](https://route.thephpleague.com/) ^6.2
 
 ### Optional Dependencies
 
-The router component focuses on routing functionality and doesn't include response emission capabilities by default. You'll need to choose and install a PSR-7 response emitter that fits your application's needs:
+Pick a PSR-7 implementation and emitter for HTTP I/O:
 
-- **Laminas HTTP Handler Runner**: `composer require laminas/laminas-httphandlerrunner` (most common)
-- **ReactPHP HTTP**: `composer require react/http` (for async applications)
-- **Slim PSR-7**: `composer require slim/psr7` (lightweight option)
-- Or implement your own custom emitter
+- PSR-7: laminas/laminas-diactoros (used in examples/tests)
+- Emitter: laminas/laminas-httphandlerrunner (SAPI emitter)
 
-## Application Architecture Overview
+```sh
+composer require laminas/laminas-diactoros laminas/laminas-httphandlerrunner
+```
 
-Here's an example showing how three modules work together: a user module with routes, an auth module that exports middleware, and an API module that imports and uses the auth middleware.
+## 📚 Documentation
 
-### Module Definitions
+- [Quick Start](docs/quick-start.md) — wire the router into a Power Modules app in minutes
 
-#### `UserModule` (Simple Module with Routes)
-- Defines user-related routes with automatic `/user/` prefixing
+## Quick Start
+
+Install:
+```sh
+composer require power-modules/router
+```
+
+Minimal bootstrap outline:
+```php
+$app = new ModularAppBuilder(__DIR__)->build();
+$app->addPowerModuleSetup(new RoutingSetup());
+$app->registerModules([RouterModule::class, YourModule::class]); // YourModule implements HasRoutes
+$router = $app->get(ModularRouterInterface::class);
+$response = $router->handle($request);
+```
+
+For the complete runnable example (controllers, modules, and emitter), see the Quick Start guide: [docs/quick-start.md](docs/quick-start.md).
+
+## Usage
+
+- Define routes in a module by implementing `HasRoutes` and returning `Route` instances
+- Use module-level middleware with `HasMiddleware`
+- Override the module prefix with `HasCustomRouteSlug` (return a leading slash, e.g. `/api/v1`)
 
 ```php
-<?php
-
-declare(strict_types=1);
-
-use Modular\Framework\Container\ConfigurableContainerInterface;
 use Modular\Framework\PowerModule\Contract\PowerModule;
 use Modular\Router\Contract\HasRoutes;
+use Modular\Router\Contract\HasMiddleware;
+use Modular\Router\Contract\HasCustomRouteSlug;
 use Modular\Router\Route;
 
-final readonly class UserModule implements PowerModule, HasRoutes
+final readonly class ApiModule implements PowerModule, HasRoutes, HasMiddleware, HasCustomRouteSlug
 {
-    public function getRoutes(): array
-    {
-        return [
-            Route::get('/users', UserController::class, 'index'),     // /user/users
-            Route::post('/users', UserController::class, 'store'),    // /user/users
-            Route::get('/users/{id}', UserController::class, 'show'), // /user/users/{id}
-        ];
-    }
-
-    public function register(ConfigurableContainerInterface $container): void
-    {
-        $container->set(UserRepository::class, UserRepository::class);
-        $container->set(UserController::class, UserController::class)
-            ->addArguments([UserRepository::class]);
-    }
-}
-```
-
-#### `AuthModule` (Module with Exported Middleware)
-- Exports authentication middleware for use by other modules
-
-```php
-<?php
-
-declare(strict_types=1);
-
-use Modular\Framework\PowerModule\Contract\ExportsComponents;
-
-final readonly class AuthModule implements PowerModule, ExportsComponents
-{
-    public static function exports(): array
-    {
-        return [AuthMiddleware::class];
-    }
-
-    public function register(ConfigurableContainerInterface $container): void
-    {
-        $container->set(TokenService::class, TokenService::class);
-        $container->set(AuthMiddleware::class, AuthMiddleware::class)
-            ->addArguments([TokenService::class]);
-    }
-}
-```
-
-#### `ApiModule` (Module with Imports and Custom Prefix)
-- Imports auth middleware and uses custom route prefix
-
-```php
-<?php
-
-declare(strict_types=1);
-
-use Modular\Framework\PowerModule\Contract\ImportsComponents;
-use Modular\Framework\PowerModule\ImportItem;
-use Modular\Router\Contract\HasCustomRouteSlug;
-
-final readonly class ApiModule implements PowerModule, HasRoutes, ImportsComponents, HasCustomRouteSlug
-{
-    public static function imports(): array
-    {
-        return [
-            ImportItem::create(AuthModule::class, AuthMiddleware::class),
-        ];
-    }
-
     public function getRouteSlug(): string
     {
-        return '/api/v1';
+        return '/api/v1'; // leading slash; avoid trailing slash to prevent double slashes
+    }
+
+    public function getMiddleware(): array
+    {
+        return [AuthMiddleware::class, LoggingMiddleware::class];
     }
 
     public function getRoutes(): array
     {
         return [
-            Route::get('/status', StatusController::class)                    // /api/v1/status
-                ->addMiddleware(AuthMiddleware::class),
-            Route::post('/data', DataController::class, 'store')              // /api/v1/data
-                ->addMiddleware(AuthMiddleware::class, ValidationMiddleware::class),
+            Route::get('/status', StatusController::class),               // /api/v1/status
+            Route::post('/data', DataController::class, 'store')          // /api/v1/data
+                ->addMiddleware(ValidationMiddleware::class),
         ];
     }
-
-    public function register(ConfigurableContainerInterface $container): void
-    {
-        // AuthMiddleware is automatically available for injection
-        $container->set(StatusController::class, StatusController::class);
-        $container->set(ValidationMiddleware::class, ValidationMiddleware::class);
-        $container->set(DataController::class, DataController::class);
-    }
 }
-```
-
-### Controller Implementation
-
-```php
-<?php
-
-declare(strict_types=1);
-
-use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\ServerRequestInterface;
-use Psr\Http\Server\RequestHandlerInterface;
-use Laminas\Diactoros\Response\JsonResponse;
-
-final readonly class UserController implements RequestHandlerInterface
-{
-    public function __construct(
-        private UserRepository $userRepository,
-    ) {}
-
-    public function handle(ServerRequestInterface $request): ResponseInterface
-    {
-        return $this->index($request);
-    }
-
-    public function index(ServerRequestInterface $request): ResponseInterface
-    {
-        $users = $this->userRepository->findAll();
-        return new JsonResponse(['users' => $users]);
-    }
-
-    public function store(ServerRequestInterface $request): ResponseInterface
-    {
-        // Create user logic
-        return new JsonResponse(['message' => 'User created'], 201);
-    }
-
-    public function show(ServerRequestInterface $request): ResponseInterface
-    {
-        $id = $request->getAttribute('id');
-        $user = $this->userRepository->findById($id);
-        return new JsonResponse(['user' => $user]);
-    }
-}
-```
-
-## Usage Example
-
-```php
-<?php
-
-declare(strict_types=1);
-
-use Modular\Framework\App\ModularAppBuilder;
-use Modular\Router\Contract\ModularRouterInterface;
-use Modular\Router\PowerModule\Setup\RoutingSetup;
-use Modular\Router\RouterModule;
-use Laminas\Diactoros\ServerRequestFactory;
-
-// Choose your preferred PSR-7 response emitter
-use Laminas\HttpHandlerRunner\Emitter\SapiEmitter;
-
-require __DIR__ . '/../vendor/autoload.php';
-
-// Build the modular application
-$app = new ModularAppBuilder(__DIR__)->build();
-
-// Add routing setup and register modules
-$app->addPowerModuleSetup(new RoutingSetup());
-$app->registerModules([
-    RouterModule::class,    // Core router module
-    AuthModule::class,      // Provides auth middleware
-    UserModule::class,      // User routes at /user/*
-    ApiModule::class,       // API routes at /api/v1/*
-]);
-
-// Get the router and handle requests
-$router = $app->get(ModularRouterInterface::class);
-$request = new ServerRequestFactory()->fromGlobals();
-$response = $router->handle($request);
-
-// Emit the response using your chosen emitter
-// Note: The router component doesn't include an emitter by default,
-// allowing you to choose the implementation that best fits your needs
-$emitter = new SapiEmitter();
-$emitter->emit($response);
-```
-
-### Response Emitter Options
-
-The router component focuses purely on routing functionality and doesn't bundle a specific response emitter, giving you the flexibility to choose the best option for your application:
-
-#### Popular PSR-7 Emitter Options:
-
-1. **Laminas HTTP Handler Runner** (Most Common)
-   ```bash
-   composer require laminas/laminas-httphandlerrunner
-   ```
-   ```php
-   use Laminas\HttpHandlerRunner\Emitter\SapiEmitter;
-   use Laminas\HttpHandlerRunner\Emitter\SapiStreamEmitter; // For large responses
-   ```
-
-2. **ReactPHP HTTP** (For Async Applications)
-   ```bash
-   composer require react/http
-   ```
-
-3. **Slim Framework Emitter** (Lightweight)
-   ```bash
-   composer require slim/psr7
-   ```
-
-4. **Custom Implementation** (For Specialized Needs)
-   ```php
-   // Implement your own emitter for specific requirements
-   class CustomEmitter {
-       public function emit(ResponseInterface $response): void {
-           // Your custom emission logic
-       }
-   }
-   ```
-
-### The Resulting Route Structure
-
-```
-GET  /user/users          → UserController::index()
-POST /user/users          → UserController::store()
-GET  /user/users/{id}     → UserController::show()
-GET  /api/v1/status       → StatusController::handle() [+ AuthMiddleware]
-POST /api/v1/data         → DataController::store() [+ AuthMiddleware + ValidationMiddleware]
 ```
 
 ## API Reference
 
-### Route Definition Methods
-
-#### HTTP Methods
+### Route definition
 
 ```php
-Route::get('/path', Controller::class, 'method');
+Route::get('/path', Controller::class, 'method');   // default method is 'handle'
 Route::post('/path', Controller::class, 'method');
 Route::put('/path', Controller::class, 'method');
 Route::patch('/path', Controller::class, 'method');
 Route::delete('/path', Controller::class, 'method');
 ```
 
-#### Route Parameters
+- Controller method default: `handle()` (PSR-15 `RequestHandlerInterface`)
+- Middleware per-route:
+  ```php
+  Route::get('/protected', ProtectedController::class)
+      ->addMiddleware(AuthMiddleware::class, ThrottleMiddleware::class);
+  ```
+
+### Module contracts
+
+- `HasRoutes`: define module routes
+- `HasMiddleware`: add module-wide middleware
+- `HasCustomRouteSlug`: override automatic prefix (return leading-slash, recommended no trailing slash)
+
+### Router interface
 
 ```php
-Route::get('/users/{id}', UserController::class, 'show');
-Route::get('/posts/{id}/comments/{commentId}', CommentController::class, 'show');
-```
-
-#### Default Controller Method
-
-If no method is specified, the router defaults to the `handle()` method (RequestHandlerInterface compliance):
-
-```php
-Route::get('/users', UserController::class); // Calls handle() method
-```
-
-### Module Contracts
-
-- **`HasRoutes`**: Implement to define module routes
-- **`HasMiddleware`**: Implement to add module-level middleware  
-- **`HasCustomRouteSlug`**: Implement to customize route prefix
-
-### Router Interface
-
-```php
-interface ModularRouterInterface extends RequestHandlerInterface
+interface ModularRouterInterface extends Psr\Http\Server\RequestHandlerInterface
 {
     public function registerPowerModuleRoutes(
-        PowerModule $powerModule,
-        ContainerInterface $moduleContainer,
-        ?PowerModuleConfig $powerModuleConfig,
+        Modular\Framework\PowerModule\Contract\PowerModule $powerModule,
+        Psr\Container\ContainerInterface $moduleContainer,
+        ?Modular\Framework\Config\Contract\PowerModuleConfig $powerModuleConfig,
     ): void;
 
     public function addResponseDecorator(callable $decorator): ModularRouterInterface;
 }
 ```
 
-## Middleware
-
-### Route-Level Middleware
-
-Add middleware to specific routes with automatic resolution from module containers:
+### Response decorators
 
 ```php
-Route::get('/protected', ProtectedController::class)
-    ->addMiddleware(AuthMiddleware::class, ValidationMiddleware::class);
-```
-
-### Module-Level Middleware
-
-Apply middleware to all routes in a module:
-
-```php
-class UserModule implements PowerModule, HasRoutes, HasMiddleware
-{
-    public function getMiddleware(): array
-    {
-        return [
-            AuthMiddleware::class,
-            LoggingMiddleware::class,
-        ];
+$router->addResponseDecorator(
+    function (Psr\Http\Message\ResponseInterface $response): Psr\Http\Message\ResponseInterface {
+        return $response->withHeader('X-App', 'PowerModules');
     }
-
-    public function getRoutes(): array
-    {
-        return [
-            Route::get('/users', UserController::class),
-        ];
-    }
-}
-```
-
-### Custom Middleware Implementation
-
-```php
-class LoggingMiddleware implements MiddlewareInterface
-{
-    public function process(
-        ServerRequestInterface $request, 
-        RequestHandlerInterface $handler
-    ): ResponseInterface {
-        // Logging logic here
-        return $handler->handle($request);
-    }
-}
-```
-
-## Route Prefixing
-
-### Automatic Prefixing
-
-Module names are automatically converted to kebab-case route prefixes:
-
-```php
-class UserManagementModule implements PowerModule, HasRoutes
-{
-    // Routes will be prefixed with '/user-management/'
-}
-```
-
-### Custom Route Prefixes
-
-Override automatic module-name prefixing for complete control:
-
-```php
-class UserModule implements PowerModule, HasRoutes, HasCustomRouteSlug
-{
-    public function getRouteSlug(): string
-    {
-        return '/api/v1/users';
-    }
-
-    public function getRoutes(): array
-    {
-        return [
-            Route::get('/', UserController::class, 'index'), // /api/v1/users/
-            Route::get('/{id}', UserController::class, 'show'), // /api/v1/users/{id}
-        ];
-    }
-}
+);
 ```
 
 ## Configuration
 
-### Custom Strategy
+The router exposes a module config with a default League/Route strategy:
 
-Customize the router's strategy (e.g., use `JsonStrategy`) by creating a configuration file named `modular_router.php` in your application's config directory:
+- Config file name: `modular_router.php` (picked up by the framework)
+- Default: `ApplicationStrategy`
+- Override example (JSON responses):
 
 ```php
 <?php
 
 declare(strict_types=1);
 
-use League\Route\Strategy\JsonStrategy;
 use Laminas\Diactoros\ResponseFactory;
+use League\Route\Strategy\JsonStrategy;
 use Modular\Router\Config\Config;
 use Modular\Router\Config\Setting;
 
@@ -449,104 +195,35 @@ return Config::create()
     ->set(Setting::Strategy, new JsonStrategy(new ResponseFactory()));
 ```
 
-The router automatically picks up this configuration during application bootstrap.
+## Route Prefixing
 
-### Response Decorators
+- Automatic prefix: kebab-case from module class name without “Module” suffix
+  - `UserManagementModule` → `/user-management`
+- Custom prefix: implement `HasCustomRouteSlug` and return a leading-slash value
+  - Recommended: no trailing slash to avoid `//` when mapping route paths
+- Prefix normalization: prefixes are normalized to include a leading slash
 
-Add global response transformations:
+## Error Semantics
 
-```php
-$router->addResponseDecorator(function (ResponseInterface $response): ResponseInterface {
-    return $response->withHeader('X-Custom-Header', 'value');
-});
-```
+- Invalid middleware type: an `InvalidArgumentException` is thrown if a resolved middleware does not implement `Psr\Http\Server\MiddlewareInterface`
+- Unresolvable module prefix: an `InvalidArgumentException` is thrown if the module name cannot be processed for prefixing
 
-## Advanced Usage
+## 🛠️ Development & Testing
 
-### Cross-Module Service Integration
-
-For complex scenarios where modules need to share services across route boundaries:
-
-```php
-// SharedServicesModule exports common services
-class SharedServicesModule implements PowerModule, ExportsComponents
-{
-    public static function exports(): array
-    {
-        return [
-            LoggerInterface::class,
-            CacheInterface::class,
-            EventDispatcherInterface::class,
-        ];
-    }
-
-    public function register(ConfigurableContainerInterface $container): void
-    {
-        $container->set(LoggerInterface::class, FileLogger::class);
-        $container->set(CacheInterface::class, RedisCache::class);
-        $container->set(EventDispatcherInterface::class, EventDispatcher::class);
-    }
-}
-
-// Multiple modules can import and use these shared services
-class OrderModule implements PowerModule, HasRoutes, ImportsComponents
-{
-    public static function imports(): array
-    {
-        return [
-            ImportItem::create(SharedServicesModule::class, 
-                LoggerInterface::class, 
-                EventDispatcherInterface::class
-            ),
-        ];
-    }
-
-    public function getRoutes(): array
-    {
-        return [
-            Route::post('/orders', OrderController::class, 'create'),
-        ];
-    }
-
-    public function register(ConfigurableContainerInterface $container): void
-    {
-        // Shared services are automatically available
-        $container->set(OrderController::class, OrderController::class)
-            ->addArguments([LoggerInterface::class, EventDispatcherInterface::class]);
-    }
-}
-```
-
-### Error Handling
-
-Implement error handling middleware that works across all modules:
-
-```php
-class ErrorHandlingMiddleware implements MiddlewareInterface
-{
-    public function process(
-        ServerRequestInterface $request, 
-        RequestHandlerInterface $handler
-    ): ResponseInterface {
-        try {
-            return $handler->handle($request);
-        } catch (Exception $e) {
-            return new JsonResponse(['error' => $e->getMessage()], 500);
-        }
-    }
-}
-```
-
-## Development & Testing
-
-Run tests, code style checks, and static analysis using the Makefile:
+Run via Makefile:
 
 ```sh
-make test         # Run PHPUnit tests
-make codestyle    # Check code style with PHP CS Fixer
-make phpstan      # Run static analysis
+make test         # PHPUnit tests
+make codestyle    # PHP CS Fixer
+make phpstan      # Static analysis
 make devcontainer # Build development container
 ```
+
+## Ecosystem
+
+- Framework: [power-modules/framework](https://github.com/power-modules/framework)
+- Router engine: [League/Route](https://route.thephpleague.com/)
+- PSR-15 middleware: [php-fig.org/psr/psr-15](https://www.php-fig.org/psr/psr-15/)
 
 ## License
 
@@ -555,13 +232,12 @@ MIT License. See [LICENSE](LICENSE) for details.
 ## Contributing
 
 1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'feat(...): added amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Commit: `git commit -m 'feat(router): add amazing feature'`
+4. Push: `git push origin feature/amazing-feature`
 5. Open a Pull Request
 
 ## Support
 
-- **[Power Modules Framework Documentation](https://github.com/power-modules/framework)**
-- **[League/Route Documentation](https://route.thephpleague.com/)**
-- **[PSR-15 Middleware Documentation](https://www.php-fig.org/psr/psr-15/)**
+- Framework repository: [power-modules/framework](https://github.com/power-modules/framework)
+- Router repository: [power-modules/router](https://github.com/power-modules/router)
