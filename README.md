@@ -218,6 +218,7 @@ use Modular\Framework\App\ModularAppBuilder;
 use Modular\Router\Contract\ModularRouterInterface;
 use Modular\Router\PowerModule\Setup\RoutingSetup;
 use Modular\Router\RouterModule;
+use Laminas\Diactoros\ServerRequestFactory;
 
 // Choose your preferred PSR-7 response emitter
 use Laminas\HttpHandlerRunner\Emitter\SapiEmitter;
@@ -238,6 +239,7 @@ $app->registerModules([
 
 // Get the router and handle requests
 $router = $app->get(ModularRouterInterface::class);
+$request = new ServerRequestFactory()->fromGlobals();
 $response = $router->handle($request);
 
 // Emit the response using your chosen emitter
