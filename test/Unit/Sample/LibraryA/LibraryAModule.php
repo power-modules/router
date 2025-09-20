@@ -32,5 +32,15 @@ class LibraryAModule implements PowerModule, HasRoutes, HasMiddleware
             LibraryAController::class,
             LibraryAController::class,
         );
+
+        $container->set(
+            RouteMiddlewareA::class,
+            RouteMiddlewareA::class,
+        );
+
+        $container->set(
+            ModuleMiddlewareA::class,
+            ModuleMiddlewareA::class,
+        );
     }
 }

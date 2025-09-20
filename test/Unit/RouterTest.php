@@ -2,6 +2,7 @@
 
 namespace Modular\Router\Test\Unit;
 
+use InvalidArgumentException;
 use Laminas\Diactoros\ResponseFactory;
 use Laminas\Diactoros\ServerRequestFactory;
 use League\Route\Strategy\JsonStrategy;
@@ -12,6 +13,7 @@ use Modular\Router\Router;
 use Modular\Router\Test\Unit\Sample\LibraryA\LibraryAModule;
 use Modular\Router\Test\Unit\Sample\LibraryA\ModuleMiddlewareA;
 use Modular\Router\Test\Unit\Sample\LibraryA\RouteMiddlewareA;
+use Modular\Router\Test\Unit\Sample\LibraryC\LibraryCModule;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\ServerRequestInterface;
@@ -54,6 +56,15 @@ class RouterTest extends TestCase
             json_encode(['header-from-middleware' => [ModuleMiddlewareA::HEADER_FROM_MIDDLEWARE_VALUE]]),
             $response->getBody()->getContents(),
         );
+    }
+
+    public function testRouterThrowsExceptionForUnknownMiddleware(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Middleware Modular\Router\Test\Unit\Sample\LibraryA\RouteMiddlewareA not found in router or module container');
+
+        $router = $this->getRouter([LibraryCModule::class]);
+        $router->handle($this->getRequest('/library-c/no-middleware', 'POST'));
     }
 
     private function getRequest(string $endpoint, string $type = 'GET'): ServerRequestInterface

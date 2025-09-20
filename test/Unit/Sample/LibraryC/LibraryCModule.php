@@ -7,6 +7,7 @@ use Modular\Framework\PowerModule\Contract\PowerModule;
 use Modular\Router\Contract\HasCustomRouteSlug;
 use Modular\Router\Contract\HasRoutes;
 use Modular\Router\Route;
+use Modular\Router\Test\Unit\Sample\LibraryA\RouteMiddlewareA;
 
 class LibraryCModule implements PowerModule, HasRoutes, HasCustomRouteSlug
 {
@@ -19,6 +20,8 @@ class LibraryCModule implements PowerModule, HasRoutes, HasCustomRouteSlug
     {
         return [
             Route::get('/test', LibraryCController::class),
+            Route::get('/no-middleware', LibraryCController::class)
+                ->addMiddleware(RouteMiddlewareA::class),
         ];
     }
 

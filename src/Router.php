@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modular\Router;
 
+use InvalidArgumentException;
 use League\Route\ContainerAwareInterface;
 use League\Route\Middleware\MiddlewareAwareInterface;
 use League\Route\RouteGroup;
@@ -124,7 +125,7 @@ class Router implements ModularRouterInterface
      *
      * @throws NotFoundExceptionInterface
      * @throws ContainerExceptionInterface
-     * @throws \InvalidArgumentException
+     * @throws InvalidArgumentException
      */
     private function getMiddleware(
         string $middlewareClassName,
@@ -135,11 +136,13 @@ class Router implements ModularRouterInterface
         } elseif ($moduleContainer->has($middlewareClassName) === true) {
             $middleware = $moduleContainer->get($middlewareClassName);
         } else {
-            $middleware = new $middlewareClassName();
+            throw new InvalidArgumentException(
+                sprintf('Middleware %s not found in router or module container', $middlewareClassName),
+            );
         }
 
         if (!$middleware instanceof MiddlewareInterface) {
-            throw new \InvalidArgumentException(
+            throw new InvalidArgumentException(
                 sprintf('Provided middleware is not an instance of %s (%s)', MiddlewareInterface::class, $middlewareClassName),
             );
         }
