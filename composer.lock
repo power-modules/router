@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "6ece9c7ff53f084950c73664afed27d0",
+    "content-hash": "574deccc06cbaf82531aaa162bd35e68",
     "packages": [
         {
             "name": "laminas/laminas-diactoros",
@@ -297,7 +297,7 @@
         },
         {
             "name": "power-modules/framework",
-            "version": "dev-main",
+            "version": "v1.0.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/power-modules/framework.git",
@@ -319,7 +319,6 @@
                 "phpstan/phpstan": "^2.1",
                 "phpunit/phpunit": "^12.3"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -352,7 +351,7 @@
             ],
             "support": {
                 "issues": "https://github.com/power-modules/framework/issues",
-                "source": "https://github.com/power-modules/framework/tree/main"
+                "source": "https://github.com/power-modules/framework/tree/v1.0.0"
             },
             "time": "2025-09-20T12:27:26+00:00"
         },
@@ -4864,9 +4863,7 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {
-        "power-modules/framework": 20
-    },
+    "stability-flags": {},
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {},
