@@ -42,6 +42,36 @@ The router applies the framework’s module encapsulation principles to routing:
 
 Under the hood, the router wraps League/Route and configures a Strategy (default: `ApplicationStrategy`) which you can override via configuration.
 
+## Constraints and Limitations
+
+### Duplicate Controller Classes Across Modules
+
+**Important**: If multiple modules use the same controller class, only the last registered module's container will be used for resolving that controller. This happens because controllers are registered in the router's internal container using the controller class name as the key, and subsequent registrations overwrite previous ones.
+
+**Example scenario:**
+```php
+// ModuleA uses UserController::class
+class ModuleA implements PowerModule, HasRoutes {
+    public function getRoutes(): array {
+        return [Route::get('/users', UserController::class)];
+    }
+}
+
+// ModuleB also uses UserController::class  
+class ModuleB implements PowerModule, HasRoutes {
+    public function getRoutes(): array {
+        return [Route::get('/profile', UserController::class)]; 
+    }
+}
+```
+
+In this case, both `/module-a/users` and `/module-b/profile` routes would resolve `UserController` from ModuleB's container (the last registered), not from their respective module containers.
+
+**Recommended solutions:**
+- Use unique controller classes per module (e.g., `ModuleA\UserController`, `ModuleB\ProfileController`)
+- Create module-specific controller subclasses if sharing common logic
+- Use composition instead of inheritance for shared controller functionality
+
 ## Installation
 
 ```sh

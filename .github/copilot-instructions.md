@@ -25,6 +25,8 @@ Routes specify `controllerName` (class string) instead of instances. The Router 
 - Router remains decoupled from controller dependencies
 - Promotes modularity and separation of concerns
 
+**Important Constraint**: If multiple modules use the same controller class, the router's internal container will overwrite previous registrations. The controller will always resolve from the last registered module's container, not the original module's container. This is because controller class names are used as registration keys. To avoid this, ensure each module uses unique controller classes.
+
 ### Route Definition Patterns
 ```php
 // In module's getRoutes() method

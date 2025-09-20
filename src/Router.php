@@ -93,7 +93,15 @@ class Router implements ModularRouterInterface
             $this->registerMiddlewares($leagueRoute, $modularRoute, $moduleContainer);
 
             /**
-             * Register controller with the InstanceViaContainerResolver, so it can be resolved via the module container
+             * Register controller with the InstanceViaContainerResolver, so it can be resolved via the module container.
+             *
+             * IMPORTANT: If multiple modules use the same controller class, the last registration will overwrite
+             * previous ones. This means the controller will always be resolved from the last registered module's
+             * container, not from the original module's container. This is because the controller class name is
+             * used as the registration key in the router container.
+             *
+             * To avoid this constraint, ensure each module uses unique controller classes.
+             *
              * @see \Modular\Router\Route
              */
             $this->container->set(
