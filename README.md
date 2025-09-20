@@ -19,7 +19,7 @@ composer require power-modules/router
 ## Requirements
 
 - PHP 8.4+
-- Power Modules Framework
+- [Power Modules Framework](https://github.com/power-modules/framework)
 - League/Route ^6.2
 - Laminas Diactoros ^3.6
 

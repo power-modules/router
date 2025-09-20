@@ -301,12 +301,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/power-modules/framework.git",
-                "reference": "02c54b6c01043edd800cedaee9f186142aeb9683"
+                "reference": "f107ee042fb4301de7bfffc50fb795e82d9f36bc"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/power-modules/framework/zipball/02c54b6c01043edd800cedaee9f186142aeb9683",
-                "reference": "02c54b6c01043edd800cedaee9f186142aeb9683",
+                "url": "https://api.github.com/repos/power-modules/framework/zipball/f107ee042fb4301de7bfffc50fb795e82d9f36bc",
+                "reference": "f107ee042fb4301de7bfffc50fb795e82d9f36bc",
                 "shasum": ""
             },
             "require": {
@@ -354,7 +354,7 @@
                 "issues": "https://github.com/power-modules/framework/issues",
                 "source": "https://github.com/power-modules/framework/tree/main"
             },
-            "time": "2025-09-20T10:59:50+00:00"
+            "time": "2025-09-20T12:09:06+00:00"
         },
         {
             "name": "psr/container",
