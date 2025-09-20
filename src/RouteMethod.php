@@ -11,4 +11,6 @@ enum RouteMethod: string
     case Put = 'PUT';
     case Delete = 'DELETE';
     case Patch = 'PATCH';
+    case Options = 'OPTIONS';
+    case Head = 'HEAD';
 }
