@@ -42,7 +42,15 @@ composer require power-modules/router
 - **PHP**: 8.4+
 - **[Power Modules Framework](https://github.com/power-modules/framework)**: ^1.0
 - **League/Route**: ^6.2
-- **Laminas Diactoros**: ^3.6
+
+### Optional Dependencies
+
+The router component focuses on routing functionality and doesn't include response emission capabilities by default. You'll need to choose and install a PSR-7 response emitter that fits your application's needs:
+
+- **Laminas HTTP Handler Runner**: `composer require laminas/laminas-httphandlerrunner` (most common)
+- **ReactPHP HTTP**: `composer require react/http` (for async applications)
+- **Slim PSR-7**: `composer require slim/psr7` (lightweight option)
+- Or implement your own custom emitter
 
 ## Application Architecture Overview
 
@@ -211,6 +219,11 @@ use Modular\Router\Contract\ModularRouterInterface;
 use Modular\Router\PowerModule\Setup\RoutingSetup;
 use Modular\Router\RouterModule;
 
+// Choose your preferred PSR-7 response emitter
+use Laminas\HttpHandlerRunner\Emitter\SapiEmitter;
+
+require __DIR__ . '/../vendor/autoload.php';
+
 // Build the modular application
 $app = new ModularAppBuilder(__DIR__)->build();
 
@@ -226,7 +239,48 @@ $app->registerModules([
 // Get the router and handle requests
 $router = $app->get(ModularRouterInterface::class);
 $response = $router->handle($request);
+
+// Emit the response using your chosen emitter
+// Note: The router component doesn't include an emitter by default,
+// allowing you to choose the implementation that best fits your needs
+$emitter = new SapiEmitter();
+$emitter->emit($response);
 ```
+
+### Response Emitter Options
+
+The router component focuses purely on routing functionality and doesn't bundle a specific response emitter, giving you the flexibility to choose the best option for your application:
+
+#### Popular PSR-7 Emitter Options:
+
+1. **Laminas HTTP Handler Runner** (Most Common)
+   ```bash
+   composer require laminas/laminas-httphandlerrunner
+   ```
+   ```php
+   use Laminas\HttpHandlerRunner\Emitter\SapiEmitter;
+   use Laminas\HttpHandlerRunner\Emitter\SapiStreamEmitter; // For large responses
+   ```
+
+2. **ReactPHP HTTP** (For Async Applications)
+   ```bash
+   composer require react/http
+   ```
+
+3. **Slim Framework Emitter** (Lightweight)
+   ```bash
+   composer require slim/psr7
+   ```
+
+4. **Custom Implementation** (For Specialized Needs)
+   ```php
+   // Implement your own emitter for specific requirements
+   class CustomEmitter {
+       public function emit(ResponseInterface $response): void {
+           // Your custom emission logic
+       }
+   }
+   ```
 
 ### The Resulting Route Structure
 
