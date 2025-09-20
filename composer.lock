@@ -297,21 +297,21 @@
         },
         {
             "name": "power-modules/framework",
-            "version": "v1.0.0",
+            "version": "v1.0.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/power-modules/framework.git",
-                "reference": "78285c2429c8d7e00f90049f909a5f2346a6c2e1"
+                "reference": "d4173aef69dee13da1b5bc1d4c2ebab144d274b7"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/power-modules/framework/zipball/78285c2429c8d7e00f90049f909a5f2346a6c2e1",
-                "reference": "78285c2429c8d7e00f90049f909a5f2346a6c2e1",
+                "url": "https://api.github.com/repos/power-modules/framework/zipball/d4173aef69dee13da1b5bc1d4c2ebab144d274b7",
+                "reference": "d4173aef69dee13da1b5bc1d4c2ebab144d274b7",
                 "shasum": ""
             },
             "require": {
+                "php": "^8.4",
                 "psr/container": "^2.0",
-                "psr/http-server-handler": "^1.0",
                 "psr/simple-cache": "^3.0"
             },
             "require-dev": {
@@ -322,8 +322,7 @@
             "type": "library",
             "autoload": {
                 "psr-4": {
-                    "Modular\\Framework\\": "src/",
-                    "Modular\\Framework\\Test\\": "test/"
+                    "Modular\\Framework\\": "src/"
                 }
             },
             "notification-url": "https://packagist.org/downloads/",
@@ -351,9 +350,9 @@
             ],
             "support": {
                 "issues": "https://github.com/power-modules/framework/issues",
-                "source": "https://github.com/power-modules/framework/tree/v1.0.0"
+                "source": "https://github.com/power-modules/framework/tree/v1.0.1"
             },
-            "time": "2025-09-20T12:27:26+00:00"
+            "time": "2025-09-20T17:32:26+00:00"
         },
         {
             "name": "psr/container",
