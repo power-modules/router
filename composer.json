@@ -25,21 +25,33 @@
             "role": "Owner"
         }
     ],
+    "support": {
+        "issues": "https://github.com/power-modules/router/issues",
+        "source": "https://github.com/power-modules/router"
+    },
     "autoload": {
         "psr-4": {
-            "Modular\\Router\\": "src/",
+            "Modular\\Router\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
             "Modular\\Router\\Test\\": "test/"
         }
     },
     "require": {
         "php": "^8.4",
         "league/route": "^6.2",
-        "laminas/laminas-diactoros": "^3.6",
         "power-modules/framework": "^1.0"
     },
     "require-dev": {
         "phpunit/phpunit": "^12.3",
         "friendsofphp/php-cs-fixer": "^3.87",
-        "phpstan/phpstan": "^2.1"
+        "phpstan/phpstan": "^2.1",
+        "laminas/laminas-diactoros": "^3.6"
+    },
+    "suggest": {
+        "laminas/laminas-httphandlerrunner": "PSR-7 response emitter for HTTP applications",
+        "laminas/laminas-diactoros": "PSR-7 implementation used in examples and tests"
     }
 }
