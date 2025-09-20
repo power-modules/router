@@ -78,7 +78,7 @@ Migration steps:
 - [ ] SemVer: Public API changes are justified and documented (BC respected or clearly marked).
 - [ ] Type-safety: Strict types, precise return types, and helpful phpdoc on public interfaces.
 - [ ] Error semantics: Exceptions are specific, messages actionable, and documented.
-- [ ] Transport-agnostic: No coupling to HTTP/router/PSR-15 in the core (remain PSR-only: container/simple-cache).
+- [ ] Adheres to PSR-7/15/17 and League/Route; no hidden globals; module encapsulation intact.
 - [ ] Dependency hygiene: No new hard deps unless essential; rationale provided.
 - [ ] Performance: No unnecessary work on the critical path (module discovery/build/resolve); notes provided.
 - [ ] Tests: Added/updated tests cover new behavior and edge cases.
