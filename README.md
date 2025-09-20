@@ -1,31 +1,57 @@
 # Power Modules Router
 
-A modular router component for the Power Modules framework that provides routing capabilities with strict module encapsulation and dependency injection integration.
+A sophisticated modular routing component for the Power Modules framework that brings **true module encapsulation** to web routing. Each module manages its own routes and middleware while maintaining complete isolation through dedicated dependency injection containers.
 
-## Features
+## 🚀 Key Innovations
 
-- **Modular Architecture**: Routes are organized by Power Modules with automatic prefixing
-- **Dependency Injection Integration**: Controllers are resolved from module-specific DI containers
-- **Middleware Support**: Both module-level and route-level middleware with PSR-15 compliance
-- **Flexible Configuration**: Customizable routing strategies and response decorators
-- **League/Route Integration**: Built on top of the proven League/Route package
+- **🎯 Module-Centric Routing**: Routes are automatically organized and prefixed by module name—no more manual route group management
+- **🔒 True Encapsulation**: Controllers and middleware are resolved from their originating module's DI container, ensuring complete separation of concerns
+- **⚡ Zero-Configuration Setup**: Just implement `HasRoutes` and the framework handles the rest—automatic route discovery, prefixing, and registration
+- **🛡️ Type-Safe Middleware**: Both route-level and module-level middleware with full PSR-15 compliance and intelligent resolution
+- **🔧 Battle-Tested Foundation**: Built on League/Route with enhanced modular capabilities for enterprise-scale applications
+
+## 🎯 Perfect For
+
+- **🏢 Modular Monoliths**: Organize complex applications with clear routing boundaries between modules
+- **📦 Plugin Systems**: Each module can define its own routes without conflicts or manual coordination
+- **🚀 API Development**: Clean separation of concerns with module-based endpoint organization
+- **👥 Team Collaboration**: Different teams can work independently on isolated routing logic
+- **🔄 Microservice Preparation**: Routes are already module-isolated, making service extraction effortless
+
+## How It Works
+
+The router extends the Power Modules framework's **module encapsulation principle** to web routing. Each module that implements `HasRoutes` becomes a self-contained routing unit with automatic organization and dependency injection.
+
+- **🔄 Automatic Route Discovery**: The framework scans modules for the `HasRoutes` interface and automatically registers their routes
+- **📁 Smart Route Prefixing**: Module names are converted to kebab-case route prefixes (e.g., `UserManagementModule` → `/user-management/`)
+- **🎛️ Custom Prefixes**: Override automatic prefixing by implementing `HasCustomRouteSlug` for complete control
+- **🔗 Container Resolution**: Controllers and middleware are resolved from their module's DI container, maintaining strict encapsulation
+
+This approach ensures that routing logic stays within module boundaries, making your application truly modular and maintainable.
 
 ## Installation
 
-```bash
+Install via Composer:
+
+```sh
 composer require power-modules/router
 ```
 
 ## Requirements
 
-- PHP 8.4+
-- [Power Modules Framework](https://github.com/power-modules/framework)
-- League/Route ^6.2
-- Laminas Diactoros ^3.6
+- **PHP**: 8.4+
+- **[Power Modules Framework](https://github.com/power-modules/framework)**: main-dev
+- **League/Route**: ^6.2
+- **Laminas Diactoros**: ^3.6
 
-## Quick Start
+## Application Architecture Overview
 
-### 1. Create a Module with Routes
+Here's an example showing how three modules work together: a user module with routes, an auth module that exports middleware, and an API module that imports and uses the auth middleware.
+
+### Module Definitions
+
+#### `UserModule` (Simple Module with Routes)
+- Defines user-related routes with automatic `/user/` prefixing
 
 ```php
 <?php
@@ -42,20 +68,94 @@ final readonly class UserModule implements PowerModule, HasRoutes
     public function getRoutes(): array
     {
         return [
-            Route::get('/users', UserController::class, 'handle'),
-            Route::post('/users', UserController::class, 'store'),
-            Route::get('/users/{id}', UserController::class, 'show'),
+            Route::get('/users', UserController::class, 'index'),     // /user/users
+            Route::post('/users', UserController::class, 'store'),    // /user/users
+            Route::get('/users/{id}', UserController::class, 'show'), // /user/users/{id}
         ];
     }
 
     public function register(ConfigurableContainerInterface $container): void
     {
-        $container->set(UserController::class, UserController::class);
+        $container->set(UserRepository::class, UserRepository::class);
+        $container->set(UserController::class, UserController::class)
+            ->addArguments([UserRepository::class]);
     }
 }
 ```
 
-### 2. Create a Controller
+#### `AuthModule` (Module with Exported Middleware)
+- Exports authentication middleware for use by other modules
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use Modular\Framework\PowerModule\Contract\ExportsComponents;
+
+final readonly class AuthModule implements PowerModule, ExportsComponents
+{
+    public static function exports(): array
+    {
+        return [AuthMiddleware::class];
+    }
+
+    public function register(ConfigurableContainerInterface $container): void
+    {
+        $container->set(TokenService::class, TokenService::class);
+        $container->set(AuthMiddleware::class, AuthMiddleware::class)
+            ->addArguments([TokenService::class]);
+    }
+}
+```
+
+#### `ApiModule` (Module with Imports and Custom Prefix)
+- Imports auth middleware and uses custom route prefix
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use Modular\Framework\PowerModule\Contract\ImportsComponents;
+use Modular\Framework\PowerModule\ImportItem;
+use Modular\Router\Contract\HasCustomRouteSlug;
+
+final readonly class ApiModule implements PowerModule, HasRoutes, ImportsComponents, HasCustomRouteSlug
+{
+    public static function imports(): array
+    {
+        return [
+            ImportItem::create(AuthModule::class, AuthMiddleware::class),
+        ];
+    }
+
+    public function getRouteSlug(): string
+    {
+        return '/api/v1';
+    }
+
+    public function getRoutes(): array
+    {
+        return [
+            Route::get('/status', StatusController::class)                    // /api/v1/status
+                ->addMiddleware(AuthMiddleware::class),
+            Route::post('/data', DataController::class, 'store')              // /api/v1/data
+                ->addMiddleware(AuthMiddleware::class, ValidationMiddleware::class),
+        ];
+    }
+
+    public function register(ConfigurableContainerInterface $container): void
+    {
+        // AuthMiddleware is automatically available for injection
+        $container->set(StatusController::class, StatusController::class);
+        $container->set(ValidationMiddleware::class, ValidationMiddleware::class);
+        $container->set(DataController::class, DataController::class);
+    }
+}
+```
+
+### Controller Implementation
 
 ```php
 <?php
@@ -69,6 +169,10 @@ use Laminas\Diactoros\Response\JsonResponse;
 
 final readonly class UserController implements RequestHandlerInterface
 {
+    public function __construct(
+        private UserRepository $userRepository,
+    ) {}
+
     public function handle(ServerRequestInterface $request): ResponseInterface
     {
         return $this->index($request);
@@ -76,52 +180,69 @@ final readonly class UserController implements RequestHandlerInterface
 
     public function index(ServerRequestInterface $request): ResponseInterface
     {
-        return new JsonResponse(['users' => []]);
+        $users = $this->userRepository->findAll();
+        return new JsonResponse(['users' => $users]);
     }
 
     public function store(ServerRequestInterface $request): ResponseInterface
     {
-        return new JsonResponse(['message' => 'User created']);
+        // Create user logic
+        return new JsonResponse(['message' => 'User created'], 201);
     }
 
     public function show(ServerRequestInterface $request): ResponseInterface
     {
         $id = $request->getAttribute('id');
-        return new JsonResponse(['user' => ['id' => $id]]);
+        $user = $this->userRepository->findById($id);
+        return new JsonResponse(['user' => $user]);
     }
 }
 ```
 
-### 3. Setup the Application
+## Usage Example
 
 ```php
 <?php
 
 declare(strict_types=1);
 
-use Modular\Framework\App\Config\Config;
 use Modular\Framework\App\ModularAppBuilder;
 use Modular\Router\Contract\ModularRouterInterface;
 use Modular\Router\PowerModule\Setup\RoutingSetup;
 use Modular\Router\RouterModule;
 
+// Build the modular application
 $app = new ModularAppBuilder(__DIR__)->build();
 
+// Add routing setup and register modules
 $app->addPowerModuleSetup(new RoutingSetup());
 $app->registerModules([
-    RouterModule::class,
-    UserModule::class,
+    RouterModule::class,    // Core router module
+    AuthModule::class,      // Provides auth middleware
+    UserModule::class,      // User routes at /user/*
+    ApiModule::class,       // API routes at /api/v1/*
 ]);
 
+// Get the router and handle requests
 $router = $app->get(ModularRouterInterface::class);
-
-// Handle request
 $response = $router->handle($request);
 ```
 
-## Route Definition
+### The Resulting Route Structure
 
-### HTTP Methods
+```
+GET  /user/users          → UserController::index()
+POST /user/users          → UserController::store()
+GET  /user/users/{id}     → UserController::show()
+GET  /api/v1/status       → StatusController::handle() [+ AuthMiddleware]
+POST /api/v1/data         → DataController::store() [+ AuthMiddleware + ValidationMiddleware]
+```
+
+## API Reference
+
+### Route Definition Methods
+
+#### HTTP Methods
 
 ```php
 Route::get('/path', Controller::class, 'method');
@@ -131,14 +252,14 @@ Route::patch('/path', Controller::class, 'method');
 Route::delete('/path', Controller::class, 'method');
 ```
 
-### Route Parameters
+#### Route Parameters
 
 ```php
 Route::get('/users/{id}', UserController::class, 'show');
 Route::get('/posts/{id}/comments/{commentId}', CommentController::class, 'show');
 ```
 
-### Default Controller Method
+#### Default Controller Method
 
 If no method is specified, the router defaults to the `handle()` method (RequestHandlerInterface compliance):
 
@@ -146,9 +267,32 @@ If no method is specified, the router defaults to the `handle()` method (Request
 Route::get('/users', UserController::class); // Calls handle() method
 ```
 
+### Module Contracts
+
+- **`HasRoutes`**: Implement to define module routes
+- **`HasMiddleware`**: Implement to add module-level middleware  
+- **`HasCustomRouteSlug`**: Implement to customize route prefix
+
+### Router Interface
+
+```php
+interface ModularRouterInterface extends RequestHandlerInterface
+{
+    public function registerPowerModuleRoutes(
+        PowerModule $powerModule,
+        ContainerInterface $moduleContainer,
+        ?PowerModuleConfig $powerModuleConfig,
+    ): void;
+
+    public function addResponseDecorator(callable $decorator): ModularRouterInterface;
+}
+```
+
 ## Middleware
 
 ### Route-Level Middleware
+
+Add middleware to specific routes with automatic resolution from module containers:
 
 ```php
 Route::get('/protected', ProtectedController::class)
@@ -156,6 +300,8 @@ Route::get('/protected', ProtectedController::class)
 ```
 
 ### Module-Level Middleware
+
+Apply middleware to all routes in a module:
 
 ```php
 class UserModule implements PowerModule, HasRoutes, HasMiddleware
@@ -177,7 +323,7 @@ class UserModule implements PowerModule, HasRoutes, HasMiddleware
 }
 ```
 
-### Custom Middleware
+### Custom Middleware Implementation
 
 ```php
 class LoggingMiddleware implements MiddlewareInterface
@@ -205,7 +351,9 @@ class UserManagementModule implements PowerModule, HasRoutes
 }
 ```
 
-### Custom Route Prefix
+### Custom Route Prefixes
+
+Override automatic module-name prefixing for complete control:
 
 ```php
 class UserModule implements PowerModule, HasRoutes, HasCustomRouteSlug
@@ -224,11 +372,12 @@ class UserModule implements PowerModule, HasRoutes, HasCustomRouteSlug
     }
 }
 ```
+
 ## Configuration
 
 ### Custom Strategy
 
-To customize the router's strategy (e.g., use `JsonStrategy`), create a configuration file named `modular_router.php` [`Modular\Router\Config\Config`](src/Config/Config.php) in your application's config directory (`<app_root>/config/`):
+Customize the router's strategy (e.g., use `JsonStrategy`) by creating a configuration file named `modular_router.php` in your application's config directory:
 
 ```php
 <?php
@@ -241,13 +390,14 @@ use Modular\Router\Config\Config;
 use Modular\Router\Config\Setting;
 
 return Config::create()
-    ->set(Setting::Strategy, new JsonStrategy(new ResponseFactory()))
-;
+    ->set(Setting::Strategy, new JsonStrategy(new ResponseFactory()));
 ```
 
-The router will automatically pick up this configuration when the application boots.
+The router automatically picks up this configuration during application bootstrap.
 
 ### Response Decorators
+
+Add global response transformations:
 
 ```php
 $router->addResponseDecorator(function (ResponseInterface $response): ResponseInterface {
@@ -257,43 +407,63 @@ $router->addResponseDecorator(function (ResponseInterface $response): ResponseIn
 
 ## Advanced Usage
 
-### Dependency Injection
+### Cross-Module Service Integration
 
-Controllers and middlewares are automatically resolved from their module's DI container:
+For complex scenarios where modules need to share services across route boundaries:
 
 ```php
-class UserController implements RequestHandlerInterface
+// SharedServicesModule exports common services
+class SharedServicesModule implements PowerModule, ExportsComponents
 {
-    public function __construct(
-        private UserService $userService,
-        private LoggerInterface $logger
-    ) {}
-
-    public function handle(ServerRequestInterface $request): ResponseInterface
+    public static function exports(): array
     {
-        $users = $this->userService->getAllUsers();
-        $this->logger->info('Fetched users', ['count' => count($users)]);
+        return [
+            LoggerInterface::class,
+            CacheInterface::class,
+            EventDispatcherInterface::class,
+        ];
+    }
 
-        return new JsonResponse(['users' => $users]);
+    public function register(ConfigurableContainerInterface $container): void
+    {
+        $container->set(LoggerInterface::class, FileLogger::class);
+        $container->set(CacheInterface::class, RedisCache::class);
+        $container->set(EventDispatcherInterface::class, EventDispatcher::class);
     }
 }
 
-// In your module
-public function register(ConfigurableContainerInterface $container): void
+// Multiple modules can import and use these shared services
+class OrderModule implements PowerModule, HasRoutes, ImportsComponents
 {
-    $container->set(UserService::class, UserService::class);
-    $container->set(LoggerInterface::class, FileLogger::class);
-    $container->set(
-        UserController::class,
-        UserController::class
-    )->addArguments([
-        UserService::class,
-        LoggerInterface::class,
-    ]);
+    public static function imports(): array
+    {
+        return [
+            ImportItem::create(SharedServicesModule::class, 
+                LoggerInterface::class, 
+                EventDispatcherInterface::class
+            ),
+        ];
+    }
+
+    public function getRoutes(): array
+    {
+        return [
+            Route::post('/orders', OrderController::class, 'create'),
+        ];
+    }
+
+    public function register(ConfigurableContainerInterface $container): void
+    {
+        // Shared services are automatically available
+        $container->set(OrderController::class, OrderController::class)
+            ->addArguments([LoggerInterface::class, EventDispatcherInterface::class]);
+    }
 }
 ```
 
 ### Error Handling
+
+Implement error handling middleware that works across all modules:
 
 ```php
 class ErrorHandlingMiddleware implements MiddlewareInterface
@@ -310,29 +480,6 @@ class ErrorHandlingMiddleware implements MiddlewareInterface
     }
 }
 ```
-
-## API Reference
-
-### Router Interface
-
-```php
-interface ModularRouterInterface extends RequestHandlerInterface
-{
-    public function registerPowerModuleRoutes(
-        PowerModule $powerModule,
-        ContainerInterface $moduleContainer,
-        ?PowerModuleConfig $powerModuleConfig,
-    ): void;
-
-    public function addResponseDecorator(callable $decorator): ModularRouterInterface;
-}
-```
-
-### Module Contracts
-
-- **`HasRoutes`**: Implement to define module routes
-- **`HasMiddleware`**: Implement to add module-level middleware
-- **`HasCustomRouteSlug`**: Implement to customize route prefix
 
 ## Development & Testing
 
@@ -359,6 +506,6 @@ MIT License. See [LICENSE](LICENSE) for details.
 
 ## Support
 
-- [Power Modules Framework Documentation](https://github.com/power-modules/framework)
-- [League/Route Documentation](https://route.thephpleague.com/)
-- [PSR-15 Middleware Documentation](https://www.php-fig.org/psr/psr-15/)
+- **[Power Modules Framework Documentation](https://github.com/power-modules/framework)**
+- **[League/Route Documentation](https://route.thephpleague.com/)**
+- **[PSR-15 Middleware Documentation](https://www.php-fig.org/psr/psr-15/)**
