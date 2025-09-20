@@ -40,7 +40,7 @@ composer require power-modules/router
 ## Requirements
 
 - **PHP**: 8.4+
-- **[Power Modules Framework](https://github.com/power-modules/framework)**: main-dev
+- **[Power Modules Framework](https://github.com/power-modules/framework)**: ^1.0
 - **League/Route**: ^6.2
 - **Laminas Diactoros**: ^3.6
 
