@@ -76,7 +76,7 @@ class RouterTest extends TestCase
             /** @var PowerModule $powerModule */
             $powerModule = new $moduleName();
             $powerModule->register($moduleContainer);
-            $router->registerPowerModuleRoutes($powerModule, $moduleContainer, null);
+            $router->registerPowerModuleRoutes($powerModule, $moduleContainer);
             $rootContainer->set($moduleName, $moduleContainer);
         }
 

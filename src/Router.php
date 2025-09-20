@@ -9,7 +9,6 @@ use League\Route\Middleware\MiddlewareAwareInterface;
 use League\Route\RouteGroup;
 use League\Route\Router as LeagueRouter;
 use League\Route\Strategy\StrategyInterface;
-use Modular\Framework\Config\Contract\PowerModuleConfig;
 use Modular\Framework\Container\ConfigurableContainer;
 use Modular\Framework\Container\ConfigurableContainerInterface;
 use Modular\Framework\Container\InstanceResolver\InstanceViaContainerResolver;
@@ -54,7 +53,6 @@ class Router implements ModularRouterInterface
     public function registerPowerModuleRoutes(
         PowerModule $powerModule,
         ContainerInterface $moduleContainer,
-        ?PowerModuleConfig $powerModuleConfig,
     ): void {
         if (!$powerModule instanceof HasRoutes) {
             return;
