@@ -1,0 +1,44 @@
+{
+    "$schema": "https://getcomposer.org/schema.json",
+    "name": "power-modules/router",
+    "description": "A modular router component for the Power Modules framework with encapsulated routing capabilities and explicit module integration",
+    "type": "library",
+    "keywords": [
+        "modular",
+        "framework",
+        "power-modules",
+        "router",
+        "routing",
+        "dependency-injection",
+        "encapsulation",
+        "modular-architecture",
+        "di-container",
+        "component-based",
+        "http-routing",
+        "middleware"
+    ],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Evgenii T",
+            "email": "roundcubez@gmail.com",
+            "role": "Owner"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "Modular\\Router\\": "src/",
+            "Modular\\Router\\Test\\": "test/"
+        }
+    },
+    "require": {
+        "league/route": "^6.2",
+        "laminas/laminas-diactoros": "^3.6",
+        "power-modules/framework": "main-dev"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^12.3",
+        "friendsofphp/php-cs-fixer": "^3.87",
+        "phpstan/phpstan": "^2.1"
+    }
+}
