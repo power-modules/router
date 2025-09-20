@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modular\Router;
 
-use InvalidArgumentException;
 use League\Route\ContainerAwareInterface;
 use League\Route\Middleware\MiddlewareAwareInterface;
 use League\Route\RouteGroup;
@@ -15,7 +14,6 @@ use Modular\Framework\Container\ConfigurableContainer;
 use Modular\Framework\Container\ConfigurableContainerInterface;
 use Modular\Framework\Container\InstanceResolver\InstanceViaContainerResolver;
 use Modular\Framework\PowerModule\Contract\PowerModule;
-use Modular\Router\Contract\HasCustomRouteSlug;
 use Modular\Router\Contract\HasMiddleware;
 use Modular\Router\Contract\HasRoutes;
 use Modular\Router\Contract\ModularRouterInterface;
@@ -30,12 +28,14 @@ class Router implements ModularRouterInterface
 {
     private ConfigurableContainerInterface $container;
     private LeagueRouter $router;
+    private RouteGroupPrefixResolver $routeGroupPrefixResolver;
 
     public function __construct(
         StrategyInterface $strategy,
     ) {
         $this->container = new ConfigurableContainer();
         $this->router = new LeagueRouter();
+        $this->routeGroupPrefixResolver = new RouteGroupPrefixResolver();
 
         if ($strategy instanceof ContainerAwareInterface) {
             $strategy->setContainer($this->container);
@@ -60,9 +60,8 @@ class Router implements ModularRouterInterface
             return;
         }
 
-        // Route group is prefixed by module name (without "Module"), unless the module implements HasCustomRouteSlug
         $routeGroup = $this->router->group(
-            $this->getRouteGroupPrefix($powerModule),
+            $this->routeGroupPrefixResolver->getRouteGroupPrefix($powerModule),
             fn (RouteGroup $routeGroup) => $this->registerRoutes($routeGroup, $powerModule, $moduleContainer),
         );
 
@@ -75,36 +74,6 @@ class Router implements ModularRouterInterface
     public function handle(ServerRequestInterface $request): ResponseInterface
     {
         return $this->router->handle($request);
-    }
-
-    /**
-     * Groups routes by module name (without "Module" suffix), or by custom slug if the module implements HasCustomRouteSlug.
-     * @throws InvalidArgumentException
-     */
-    private function getRouteGroupPrefix(PowerModule $powerModule): string
-    {
-        if ($powerModule instanceof HasCustomRouteSlug) {
-            return $powerModule->getRouteSlug();
-        }
-
-        $className = $powerModule::class;
-        $moduleName = preg_replace('/.*\\\\([a-zA-Z0-9]+)Module$/', '$1', $className);
-
-        if (is_string($moduleName) === false) {
-            throw new InvalidArgumentException(
-                sprintf('Unable to get module route group prefix: %s', $className),
-            );
-        }
-
-        $moduleName = preg_replace('/(?<=[a-z])(?=[A-Z])/', '-', $moduleName);
-
-        if (is_string($moduleName) === false) {
-            throw new \InvalidArgumentException(
-                sprintf('Unable to convert module route group prefix: %s', $className),
-            );
-        }
-
-        return strtolower($moduleName);
     }
 
     private function registerRoutes(
