@@ -10,6 +10,7 @@ use Modular\Framework\Container\ConfigurableContainer;
 use Modular\Framework\PowerModule\Contract\PowerModule;
 use Modular\Router\Contract\ModularRouterInterface;
 use Modular\Router\Router;
+use Modular\Router\Test\Unit\Sample\LibraryA\LibraryAController;
 use Modular\Router\Test\Unit\Sample\LibraryA\LibraryAModule;
 use Modular\Router\Test\Unit\Sample\LibraryA\ModuleMiddlewareA;
 use Modular\Router\Test\Unit\Sample\LibraryA\RouteMiddlewareA;
@@ -29,7 +30,7 @@ class RouterTest extends TestCase
         $response->getBody()->rewind();
 
         self::assertSame(
-            json_encode(['data' => 'Modular Framework is awesome!']),
+            json_encode(LibraryAController::HANDLE_RESPONSE),
             $response->getBody()->getContents(),
         );
     }

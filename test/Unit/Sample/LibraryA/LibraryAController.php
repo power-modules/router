@@ -9,11 +9,13 @@ use Psr\Http\Server\RequestHandlerInterface;
 
 class LibraryAController implements RequestHandlerInterface
 {
+    public const array HANDLE_RESPONSE = [
+        'data' => 'Modular Framework is awesome!',
+    ];
+
     public function handle(ServerRequestInterface $request): ResponseInterface
     {
-        return new JsonResponse([
-            'data' => 'Modular Framework is awesome!',
-        ]);
+        return new JsonResponse(self::HANDLE_RESPONSE);
     }
 
     public function featureB(ServerRequestInterface $request): ResponseInterface

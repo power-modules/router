@@ -6,6 +6,7 @@ use Modular\Framework\PowerModule\Contract\CanSetupPowerModule;
 use Modular\Framework\PowerModule\PowerModuleHelper;
 use Modular\Framework\PowerModule\Setup\PowerModuleSetupDto;
 use Modular\Framework\PowerModule\Setup\SetupPhase;
+use Modular\Router\Contract\HasRoutes;
 use Modular\Router\Contract\ModularRouterInterface;
 
 class RoutingSetup implements CanSetupPowerModule
@@ -13,6 +14,10 @@ class RoutingSetup implements CanSetupPowerModule
     public function setup(PowerModuleSetupDto $powerModuleSetupDto): void
     {
         if ($powerModuleSetupDto->setupPhase !== SetupPhase::Post) {
+            return;
+        }
+
+        if (!$powerModuleSetupDto->powerModule instanceof HasRoutes) {
             return;
         }
 

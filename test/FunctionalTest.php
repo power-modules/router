@@ -11,6 +11,7 @@ use Modular\Framework\App\ModularAppBuilder;
 use Modular\Router\Contract\ModularRouterInterface;
 use Modular\Router\PowerModule\Setup\RoutingSetup;
 use Modular\Router\RouterModule;
+use Modular\Router\Test\Unit\Sample\LibraryA\LibraryAController;
 use Modular\Router\Test\Unit\Sample\LibraryA\LibraryAModule;
 use PHPUnit\Framework\TestCase;
 
@@ -33,6 +34,6 @@ class FunctionalTest extends TestCase
 
         $response = $router->handle($request);
         $response->getBody()->rewind();
-        self::assertSame('{"data":"Modular Framework is awesome!"}', $response->getBody()->getContents());
+        self::assertSame(json_encode(LibraryAController::HANDLE_RESPONSE), $response->getBody()->getContents());
     }
 }
