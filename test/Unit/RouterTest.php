@@ -24,38 +24,34 @@ class RouterTest extends TestCase
 {
     public function testRouterCanRegisterPowerModules(): void
     {
-        $router = $this->getRouter([LibraryAModule::class]);
-
-        $response = $router->handle($this->getRequest('/library-a/feature-a'));
-        $response->getBody()->rewind();
+        $rootContainer = new ConfigurableContainer();
+        $router = $this->getRouter($rootContainer, [LibraryAModule::class]);
 
         self::assertSame(
             json_encode(LibraryAController::HANDLE_RESPONSE),
-            $response->getBody()->getContents(),
+            (string) $router->handle($this->getRequest('/library-a/feature-a'))->getBody(),
         );
     }
 
     public function testRouterCanRegisterRouteMiddleware(): void
     {
-        $router = $this->getRouter([LibraryAModule::class]);
-        $response = $router->handle($this->getRequest('/library-a/feature-b'));
-        $response->getBody()->rewind();
+        $rootContainer = new ConfigurableContainer();
+        $router = $this->getRouter($rootContainer, [LibraryAModule::class]);
 
         self::assertSame(
             json_encode(['attribute-from-middleware' => RouteMiddlewareA::ATTRIBUTE_FROM_MIDDLEWARE_VALUE]),
-            $response->getBody()->getContents(),
+            (string) $router->handle($this->getRequest('/library-a/feature-b'))->getBody(),
         );
     }
 
     public function testRouterCanRegisterModuleMiddleware(): void
     {
-        $router = $this->getRouter([LibraryAModule::class]);
-        $response = $router->handle($this->getRequest('/library-a/feature-c'));
-        $response->getBody()->rewind();
+        $rootContainer = new ConfigurableContainer();
+        $router = $this->getRouter($rootContainer, [LibraryAModule::class]);
 
         self::assertSame(
             json_encode(['header-from-middleware' => [ModuleMiddlewareA::HEADER_FROM_MIDDLEWARE_VALUE]]),
-            $response->getBody()->getContents(),
+            (string) $router->handle($this->getRequest('/library-a/feature-c'))->getBody(),
         );
     }
 
@@ -64,7 +60,8 @@ class RouterTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Middleware Modular\Router\Test\Unit\Sample\LibraryA\RouteMiddlewareA not found in router or module container');
 
-        $router = $this->getRouter([LibraryCModule::class]);
+        $rootContainer = new ConfigurableContainer();
+        $router = $this->getRouter($rootContainer, [LibraryCModule::class]);
         $router->handle($this->getRequest('/library-c/no-middleware', 'POST'));
     }
 
@@ -76,21 +73,22 @@ class RouterTest extends TestCase
     /**
      * @param array<class-string<PowerModule>> $modules
      */
-    private function getRouter(array $modules): ModularRouterInterface
+    private function getRouter(ConfigurableContainer $rootContainer, array $modules): ModularRouterInterface
     {
         $router = new Router(
             new JsonStrategy(new ResponseFactory()),
         );
-        $rootContainer = new ConfigurableContainer();
-        $moduleContainer = new ConfigurableContainer();
 
         foreach ($modules as $moduleName) {
             /** @var PowerModule $powerModule */
             $powerModule = new $moduleName();
+            $moduleContainer = new ConfigurableContainer();
             $powerModule->register($moduleContainer);
             $router->registerPowerModuleRoutes($powerModule, $moduleContainer);
             $rootContainer->set($moduleName, $moduleContainer);
         }
+
+        $rootContainer->set(ModularRouterInterface::class, $router);
 
         return $router;
     }

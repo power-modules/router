@@ -30,10 +30,11 @@ class FunctionalTest extends TestCase
         ]);
 
         $router = $app->get(ModularRouterInterface::class);
-        $request = (new ServerRequestFactory())->createServerRequest('GET', '/library-a/feature-a');
+        $request = new ServerRequestFactory()->createServerRequest('GET', '/library-a/feature-a');
 
-        $response = $router->handle($request);
-        $response->getBody()->rewind();
-        self::assertSame(json_encode(LibraryAController::HANDLE_RESPONSE), $response->getBody()->getContents());
+        self::assertSame(
+            json_encode(LibraryAController::HANDLE_RESPONSE),
+            (string) $router->handle($request)->getBody(),
+        );
     }
 }
