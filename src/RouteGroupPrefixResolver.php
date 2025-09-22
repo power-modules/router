@@ -8,6 +8,20 @@ use InvalidArgumentException;
 use Modular\Framework\PowerModule\Contract\PowerModule;
 use Modular\Router\Contract\HasCustomRouteSlug;
 
+/**
+ * Resolves route group prefixes for Power Modules.
+ *
+ * Automatically converts module class names to kebab-case URL prefixes
+ * (e.g., UserModule → /user, ApiGatewayModule → /api-gateway) or uses
+ * custom slugs when modules implement HasCustomRouteSlug.
+ *
+ * Note: This class runs during application bootstrap on every request in
+ * traditional PHP "born to die" environments. While the string operations
+ * are lightweight, caching would require persistent storage (file, APCu, etc.)
+ * which may not be justified for the minimal performance gain.
+ *
+ * If performance becomes a concern, consider implementing caching strategies.
+ */
 class RouteGroupPrefixResolver
 {
     /**
