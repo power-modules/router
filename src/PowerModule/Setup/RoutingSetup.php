@@ -3,7 +3,6 @@
 namespace Modular\Router\PowerModule\Setup;
 
 use Modular\Framework\PowerModule\Contract\CanSetupPowerModule;
-use Modular\Framework\PowerModule\PowerModuleHelper;
 use Modular\Framework\PowerModule\Setup\PowerModuleSetupDto;
 use Modular\Framework\PowerModule\Setup\SetupPhase;
 use Modular\Router\Contract\HasRoutes;
@@ -29,7 +28,7 @@ class RoutingSetup implements CanSetupPowerModule
         $router = $powerModuleSetupDto->rootContainer->get(ModularRouterInterface::class);
         $router->registerPowerModuleRoutes(
             $powerModuleSetupDto->powerModule,
-            $powerModuleSetupDto->rootContainer->get(PowerModuleHelper::getPowerModuleName($powerModuleSetupDto->powerModule)),
+            $powerModuleSetupDto->moduleContainer,
         );
     }
 }
