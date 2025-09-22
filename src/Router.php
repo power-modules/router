@@ -95,14 +95,16 @@ class Router implements ModularRouterInterface
             /**
              * Register controller with the InstanceViaContainerResolver, so it can be resolved via the module container.
              *
-             * IMPORTANT: If multiple modules use the same controller class, the last registration will overwrite
-             * previous ones. This means the controller will always be resolved from the last registered module's
-             * container, not from the original module's container. This is because the controller class name is
-             * used as the registration key in the router container.
+             * Controllers are registered using their fully qualified class name as the key (e.g., App\User\UserController).
+             * The InstanceViaContainerResolver ensures the controller is instantiated from its originating module's
+             * container, maintaining proper module encapsulation and dependency resolution.
              *
-             * To avoid this constraint, ensure each module uses unique controller classes.
+             * Different namespaces prevent controller class conflicts naturally. If modules intentionally share
+             * the same controller class (same fully qualified name), the last registration will be used,
+             * which is typically acceptable for shared components.
              *
              * @see \Modular\Router\Route
+             * @see \Modular\Framework\Container\InstanceResolver\InstanceViaContainerResolver
              */
             $this->container->set(
                 $modularRoute->controllerName,

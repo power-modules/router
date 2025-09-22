@@ -224,6 +224,15 @@ $app = new ModularAppBuilder(__DIR__)
     ->build();
 ```
 
+## Controller Resolution
+
+Controllers are resolved from their originating module's container, maintaining proper encapsulation.
+
+- Uses fully qualified class names (e.g., `App\User\UserController`)
+- No naming conflicts between modules with different namespaces
+
+See [Controller Resolution Strategy](architecture.md#controller-resolution-strategy) for technical details.
+
 ## Middleware Resolution
 
 Middleware classes are resolved with this precedence:
@@ -248,29 +257,7 @@ Middleware classes are resolved with this precedence:
 - **404 Not Found**: No matching route
 - **405 Method Not Allowed**: Route exists but wrong HTTP method
 
-## Important Constraints
-
-### Controller Class Uniqueness
-**Critical**: Multiple modules cannot use the same controller class name.
-
-```php
-// ❌ Problem: Same class name overwrites previous registration
-namespace App\Admin;
-class UserController {} // First
-
-namespace App\Api;
-class UserController {} // Overwrites first!
-
-// ✅ Solutions
-class AdminUserController {}  // Unique names
-class ApiUserController {}
-
-// OR use fully qualified names consistently
-App\Admin\UserController::class
-App\Api\UserController::class
-```
-
-### Route Prefix Rules
+## Route Prefix Rules
 - Must start with `/` (e.g., `/api/v1`, not `api/v1`)
 - Avoid trailing slashes to prevent double-slash URLs
 - Module names auto-convert: `UserModule` → `/user`, `ApiGatewayModule` → `/api-gateway`

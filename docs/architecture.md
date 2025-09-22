@@ -179,30 +179,55 @@ Complex routing behavior emerges from simple, composable pieces:
 - **Contract Testing**: Ensure interface compliance
 - **End-to-End Testing**: Full request/response cycles
 
-## Important Constraints
+## Controller Resolution Strategy
 
-### Controller Class Uniqueness
+### How Controllers Are Resolved
 
-**Critical Design Limitation**: Multiple modules cannot share the same controller class name.
+The router uses a sophisticated controller resolution strategy that maintains module encapsulation:
 
-**Why This Matters**:
-- Controller classes are registered by class name as the container key
-- Later registrations overwrite earlier ones
-- Controllers will resolve from the wrong module's container
+**Registration Process**:
+1. Controllers are registered using their **fully qualified class name** (e.g., `App\User\UserController`)
+2. Each controller registration includes a reference to its originating module's container
+3. The `InstanceViaContainerResolver` handles resolution from the correct module container
 
-**Mitigation Strategies**:
-- Use namespace-specific controller classes
-- Adopt module-specific naming conventions
-- Prefer composition over shared controller inheritance
+**Resolution Process**:
+1. When a request arrives, the router looks up the controller by its fully qualified class name
+2. The `InstanceViaContainerResolver` receives the module container as the resolution context
+3. The controller is instantiated from its originating module's container with proper dependencies
+
+**Key Benefits**:
+- **True Module Encapsulation**: Controllers access only their module's services
+- **No Class Name Conflicts**: Different namespaces prevent collisions naturally
+- **Proper Dependency Resolution**: Each controller gets dependencies from its own module
+- **Container Isolation**: Modules cannot accidentally access other modules' private services
+
+### Controller Sharing Patterns
+
+**Namespace Separation (Recommended)**:
+```php
+// UserModule
+App\User\UserController::class
+
+// AdminModule  
+App\Admin\UserController::class
+```
+These are completely separate classes despite similar names.
+
+**Intentional Controller Sharing (Advanced)**:
+```php
+// Multiple modules can deliberately share the same controller class
+App\Shared\HealthController::class
+```
+In this case, the last registered module's container will be used for resolution, which is usually acceptable for shared components.
 
 ### Module Loading Order
 
-Module registration order can affect:
-- Controller resolution (last wins for duplicate classes)
-- Middleware precedence in some edge cases
-- Configuration merging behavior
+Module registration order has minimal impact:
+- **Controller resolution**: Fully qualified names prevent conflicts
+- **Middleware precedence**: Module middleware runs in registration order
+- **Configuration merging**: Later modules can override earlier configuration
 
-**Best Practice**: Keep modules independent and avoid relying on registration order.
+**Best Practice**: Design modules to be order-independent for maximum flexibility.
 
 ## Extension Points
 

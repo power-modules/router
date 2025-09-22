@@ -23,9 +23,15 @@ This is a **modular router component** for the Power Modules framework that prov
 
 ### Dependency Injection Philosophy
 Routes specify `controllerName` (class string) instead of instances. The Router registers controllers with module-specific containers using `InstanceViaContainerResolver`, ensuring:
-- Controllers are resolved from their originating module's DI container
+- Controllers are resolved from their originating module's DI container using fully qualified class names
 - Router remains decoupled from controller dependencies
 - Promotes modularity and separation of concerns
+- No class name conflicts due to namespace separation (e.g., `App\User\UserController` vs `App\Admin\UserController`)
+
+### Controller Resolution Process
+1. **Registration**: `$container->set($fullyQualifiedClassName, $moduleContainer, InstanceViaContainerResolver::class)`
+2. **Resolution**: `InstanceViaContainerResolver` calls `$moduleContainer->get($fullyQualifiedClassName)`
+3. **Result**: Controller instantiated from correct module with proper dependencies
 
 ### Route Definition Patterns
 ```php
@@ -90,8 +96,9 @@ return [
 ## Key Conventions
 
 - **Controllers**: Default to `handle()` method if not specified in route definition
+- **Controller Resolution**: Uses fully qualified class names via `InstanceViaContainerResolver` from module containers
 - **Middleware**: Must implement PSR-15 `MiddlewareInterface`
 - **Module naming**: Auto-converts to kebab-case route prefixes (LibraryAModule → /library-a/)
 - **Route middleware**: Resolved from module containers first, then router container
 - **PHP version**: Requires PHP 8.4+ for latest enum and type system features
-- **Container keys**: Controller class names used as registration keys (avoid duplicates across modules)
+- **No Class Conflicts**: Namespace separation prevents controller name collisions naturally
