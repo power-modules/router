@@ -9,13 +9,15 @@ This is a **modular router component** for the Power Modules framework that prov
 - **`Router.php`**: Main router implementation that wraps League/Route with modular power module integration
 - **`Route.php`**: Route definition class with middleware support and controller reference for DI resolution
 - **`RouterModule.php`**: Power Module implementation that exports the router as a service
+- **`RouteGroupPrefixResolver.php`**: Handles automatic kebab-case conversion of module names to URL prefixes
 - **Contracts**: Interface-driven design defining module behaviors (`HasRoutes`, `HasMiddleware`, `HasCustomRouteSlug`)
 
 ## Modular Architecture Patterns
 
 ### Power Module Integration
 - Modules implement `HasRoutes` to define routes via `getRoutes(): array<Route>`
-- Route groups are auto-prefixed by module name (e.g., `FooBarModule` → `/foo-bar/`)
+- Route groups are auto-prefixed by module name (e.g., `LibraryAModule` → `/library-a/`)
+- Prefix logic: strips "Module" suffix, converts PascalCase to kebab-case, adds leading slash
 - Override prefixes by implementing `HasCustomRouteSlug::getRouteSlug()`
 - Module-level middleware via `HasMiddleware::getMiddleware()`
 
@@ -25,8 +27,6 @@ Routes specify `controllerName` (class string) instead of instances. The Router 
 - Router remains decoupled from controller dependencies
 - Promotes modularity and separation of concerns
 
-**Important Constraint**: If multiple modules use the same controller class, the router's internal container will overwrite previous registrations. The controller will always resolve from the last registered module's container, not the original module's container. This is because controller class names are used as registration keys. To avoid this, ensure each module uses unique controller classes.
-
 ### Route Definition Patterns
 ```php
 // In module's getRoutes() method
@@ -34,27 +34,38 @@ return [
     Route::get('/users', UserController::class, 'index'),
     Route::post('/users', UserController::class, 'store')
         ->addMiddleware(ValidationMiddleware::class),
+    // Method defaults to 'handle' if not specified
+    Route::get('/profile', ProfileController::class),
 ];
 ```
+
+### Middleware Resolution Chain
+- **Route-level middleware**: Resolved from module container first, then router container
+- **Module-level middleware**: Applied to all routes in the module
+- **Precedence**: Module middleware → Route middleware → Controller
+- All middleware must implement PSR-15 `MiddlewareInterface`
 
 ## Development Workflow
 
 ### Build Commands
 - `make test`: Run PHPUnit tests (no coverage)
-- `make codestyle`: Check PHP CS Fixer compliance  
-- `make phpstan`: Static analysis with PHPStan
+- `make codestyle`: Check PHP CS Fixer compliance
+- `make phpstan`: Static analysis with PHPStan (level 8)
 - `make devcontainer`: Build Docker dev container
 
 ### Testing Patterns
 - Unit tests in `test/Unit/` follow `#[CoversClass(ClassName::class)]` attribute pattern
 - Test modules in `test/Unit/Sample/` demonstrate middleware and routing integration
 - Use `ConfigurableContainer` for DI testing with module registration
+- Test both route resolution and middleware execution in RouterTest.php
 
 ### Code Standards
-- Strict types enabled (`declare(strict_types=1);`)
-- PSR-4 autoloading: `Modular\Router\` → `src/`
-- Enum-based HTTP methods (`RouteMethod::Get`, etc.)
-- Interface contracts over concrete dependencies
+- **Strict types**: `declare(strict_types=1);` on every file
+- **PSR-4 autoloading**: `Modular\Router\` → `src/`
+- **Enum-based HTTP methods**: `RouteMethod::Get`, `RouteMethod::Post`, etc.
+- **Interface contracts**: Prefer interfaces over concrete dependencies
+- **PHP CS Fixer**: PSR-12 + custom rules (trailing commas, ordered imports, no unused imports)
+- **PHPStan**: Level 8 analysis for maximum type safety
 
 ## Configuration System
 
@@ -67,17 +78,20 @@ return [
 ### Dependencies
 - **League/Route**: Core routing engine (wrapped, not extended)
 - **Power Modules Framework**: Module system and DI container
-- **Laminas Diactoros**: PSR-7 HTTP message implementation
+- **Laminas Diactoros**: PSR-7 HTTP message implementation (dev/test dependency)
 
 ### Extension Points
 - Implement `HasRoutes` for route registration
-- Implement `HasMiddleware` for middleware stacks
+- Implement `HasMiddleware` for middleware stacks  
 - Implement `HasCustomRouteSlug` for custom route prefixes
 - Use `addResponseDecorator()` for response transformation
+- Replace default `ApplicationStrategy` via config for custom response handling
 
 ## Key Conventions
 
-- Controllers default to `handle()` method if not specified
-- Middleware classes must implement PSR-15 `MiddlewareInterface`
-- Module names auto-convert to kebab-case route prefixes
-- Route middleware resolved from module containers first, then router container
+- **Controllers**: Default to `handle()` method if not specified in route definition
+- **Middleware**: Must implement PSR-15 `MiddlewareInterface`
+- **Module naming**: Auto-converts to kebab-case route prefixes (LibraryAModule → /library-a/)
+- **Route middleware**: Resolved from module containers first, then router container
+- **PHP version**: Requires PHP 8.4+ for latest enum and type system features
+- **Container keys**: Controller class names used as registration keys (avoid duplicates across modules)

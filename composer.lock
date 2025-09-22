@@ -209,16 +209,16 @@
         },
         {
             "name": "power-modules/framework",
-            "version": "v1.1.0",
+            "version": "v1.1.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/power-modules/framework.git",
-                "reference": "b45a5aaaface955377617e61b3ddcf343f50367c"
+                "reference": "78c8c54460db4648913c5b97da105de15930c2d2"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/power-modules/framework/zipball/b45a5aaaface955377617e61b3ddcf343f50367c",
-                "reference": "b45a5aaaface955377617e61b3ddcf343f50367c",
+                "url": "https://api.github.com/repos/power-modules/framework/zipball/78c8c54460db4648913c5b97da105de15930c2d2",
+                "reference": "78c8c54460db4648913c5b97da105de15930c2d2",
                 "shasum": ""
             },
             "require": {
@@ -262,9 +262,9 @@
             ],
             "support": {
                 "issues": "https://github.com/power-modules/framework/issues",
-                "source": "https://github.com/power-modules/framework/tree/v1.1.0"
+                "source": "https://github.com/power-modules/framework/tree/v1.1.1"
             },
-            "time": "2025-09-20T22:16:24+00:00"
+            "time": "2025-09-21T20:03:52+00:00"
         },
         {
             "name": "psr/container",
