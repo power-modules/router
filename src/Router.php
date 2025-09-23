@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modular\Router;
 
-use InvalidArgumentException;
 use League\Route\ContainerAwareInterface;
 use League\Route\Middleware\MiddlewareAwareInterface;
 use League\Route\RouteGroup;
@@ -17,12 +16,9 @@ use Modular\Framework\PowerModule\Contract\PowerModule;
 use Modular\Router\Contract\HasMiddleware;
 use Modular\Router\Contract\HasRoutes;
 use Modular\Router\Contract\ModularRouterInterface;
-use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\ContainerInterface;
-use Psr\Container\NotFoundExceptionInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
-use Psr\Http\Server\MiddlewareInterface;
 
 class Router implements ModularRouterInterface
 {
@@ -122,41 +118,11 @@ class Router implements ModularRouterInterface
         HasMiddleware $hasMiddleware,
         ContainerInterface $moduleContainer,
     ): void {
-        $middlewareAwareInterface->middlewares(
-            array_map(
-                fn (string $middlewareClassName): MiddlewareInterface => $this->getMiddleware($middlewareClassName, $moduleContainer),
-                $hasMiddleware->getMiddleware(),
-            ),
-        );
-    }
-
-    /**
-     * @param class-string<MiddlewareInterface> $middlewareClassName
-     *
-     * @throws NotFoundExceptionInterface
-     * @throws ContainerExceptionInterface
-     * @throws InvalidArgumentException
-     */
-    private function getMiddleware(
-        string $middlewareClassName,
-        ContainerInterface $moduleContainer,
-    ): MiddlewareInterface {
-        if ($this->container->has($middlewareClassName) === true) {
-            $middleware = $this->container->get($middlewareClassName);
-        } elseif ($moduleContainer->has($middlewareClassName) === true) {
-            $middleware = $moduleContainer->get($middlewareClassName);
-        } else {
-            throw new InvalidArgumentException(
-                sprintf('Middleware %s not found in router or module container', $middlewareClassName),
-            );
+        foreach ($hasMiddleware->getMiddleware() as $middlewareClassName) {
+            // The \League\Route\Dispatcher is able to resolve middleware lazily, if the strategy is container aware
+            // All we need to do is register the class names in the root container with reference to the module container
+            $this->container->set($middlewareClassName, $moduleContainer, InstanceViaContainerResolver::class);
+            $middlewareAwareInterface->lazyMiddleware($middlewareClassName);
         }
-
-        if (!$middleware instanceof MiddlewareInterface) {
-            throw new InvalidArgumentException(
-                sprintf('Provided middleware is not an instance of %s (%s)', MiddlewareInterface::class, $middlewareClassName),
-            );
-        }
-
-        return $middleware;
     }
 }

@@ -100,6 +100,31 @@ This design allows for:
 - **Route-specific concerns** (validation, rate limiting)
 - **Flexible composition** of middleware stacks
 
+### Lazy Middleware Resolution Strategy
+
+The router employs an innovative lazy resolution approach that combines League Route's built-in lazy loading with the Power Modules container system:
+
+**Registration Phase** (during bootstrap):
+```php
+// For each middleware class, register a container reference
+$this->container->set($middlewareClassName, $moduleContainer, InstanceViaContainerResolver::class);
+$middlewareAwareInterface->lazyMiddleware($middlewareClassName);
+```
+
+**Resolution Phase** (per request):
+1. League Route calls `$routerContainer->get($middlewareClassName)` when route is matched
+2. `InstanceViaContainerResolver` delegates to `$moduleContainer->get($middlewareClassName)`
+3. Middleware instantiated from correct module with proper dependencies
+
+**Key Benefits**:
+- **Performance**: Middleware only resolved when routes are actually hit
+- **Memory Efficiency**: No pre-instantiated middleware instances during bootstrap
+- **Module Encapsulation**: Middleware resolves from originating module container
+- **Framework Integration**: Leverages League Route's `ContainerAwareInterface` strategy
+- **Consistency**: Same `InstanceViaContainerResolver` pattern used for controllers
+
+This approach demonstrates how to work **with** existing framework patterns rather than against them, achieving both performance and architectural goals.
+
 ## Request Lifecycle
 
 The router integrates seamlessly with the Power Modules framework lifecycle:

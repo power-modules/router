@@ -2,11 +2,11 @@
 
 namespace Modular\Router\Test\Unit;
 
-use InvalidArgumentException;
 use Laminas\Diactoros\ResponseFactory;
 use Laminas\Diactoros\ServerRequestFactory;
 use League\Route\Strategy\JsonStrategy;
 use Modular\Framework\Container\ConfigurableContainer;
+use Modular\Framework\Container\Exception\ServiceDefinitionNotFound;
 use Modular\Framework\PowerModule\Contract\PowerModule;
 use Modular\Router\Contract\ModularRouterInterface;
 use Modular\Router\Router;
@@ -57,12 +57,12 @@ class RouterTest extends TestCase
 
     public function testRouterThrowsExceptionForUnknownMiddleware(): void
     {
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Middleware Modular\Router\Test\Unit\Sample\LibraryA\RouteMiddlewareA not found in router or module container');
+        $this->expectException(ServiceDefinitionNotFound::class);
+        $this->expectExceptionMessage('Service definition with id "Modular\Router\Test\Unit\Sample\LibraryA\RouteMiddlewareA" was not found.');
 
         $rootContainer = new ConfigurableContainer();
         $router = $this->getRouter($rootContainer, [LibraryCModule::class]);
-        $router->handle($this->getRequest('/library-c/no-middleware', 'POST'));
+        $router->handle($this->getRequest('/already-has-slash/no-middleware', 'GET'));
     }
 
     private function getRequest(string $endpoint, string $type = 'GET'): ServerRequestInterface
