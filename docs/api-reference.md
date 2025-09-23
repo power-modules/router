@@ -236,8 +236,8 @@ See [Controller Resolution Strategy](architecture.md#controller-resolution-strat
 ## Middleware Resolution
 
 Middleware classes are resolved with this precedence:
-1. **Router Container**: Check router's internal container first
-2. **Module Container**: Fall back to originating module's container
+1. **Router Container**: Exported/shared middleware (via `ExportsComponents`)
+2. **Module Container**: Module-private middleware (not exported)
 3. **Error**: Throw `InvalidArgumentException` if not found
 
 **Requirements**:
