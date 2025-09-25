@@ -10,7 +10,7 @@ This is a **modular router component** for the Power Modules framework that prov
 - **`Route.php`**: Route definition class with middleware support and controller reference for DI resolution
 - **`RouterModule.php`**: Power Module implementation that exports the router as a service
 - **`RouteGroupPrefixResolver.php`**: Handles automatic kebab-case conversion of module names to URL prefixes
-- **Contracts**: Interface-driven design defining module behaviors (`HasRoutes`, `HasMiddleware`, `HasCustomRouteSlug`)
+- **Contracts**: Interface-driven design defining module behaviors (`HasRoutes`, `HasMiddleware`, `HasCustomRouteSlug`, `HasResponseDecorators`)
 
 ## Modular Architecture Patterns
 
@@ -20,6 +20,7 @@ This is a **modular router component** for the Power Modules framework that prov
 - Prefix logic: strips "Module" suffix, converts PascalCase to kebab-case, adds leading slash
 - Override prefixes by implementing `HasCustomRouteSlug::getRouteSlug()`
 - Module-level middleware via `HasMiddleware::getMiddleware()`
+- Module-level response decorators via `HasResponseDecorators::getResponseDecorators()`
 
 ### Dependency Injection Philosophy
 Routes specify `controllerName` (class string) instead of instances. The Router registers controllers with module-specific containers using `InstanceViaContainerResolver`, ensuring:
@@ -40,6 +41,8 @@ return [
     Route::get('/users', UserController::class, 'index'),
     Route::post('/users', UserController::class, 'store')
         ->addMiddleware(ValidationMiddleware::class),
+    Route::get('/profile', ProfileController::class)
+        ->addResponseDecorator(fn($r) => $r->withHeader('X-Custom', 'true')),
     // Method defaults to 'handle' if not specified
     Route::get('/profile', ProfileController::class),
 ];
@@ -90,8 +93,10 @@ return [
 - Implement `HasRoutes` for route registration
 - Implement `HasMiddleware` for middleware stacks  
 - Implement `HasCustomRouteSlug` for custom route prefixes
-- Use `addResponseDecorator()` for response transformation
-- Replace default `ApplicationStrategy` via config for custom response handling
+- Implement `HasResponseDecorators` for module-level response decorators
+- Use `addResponseDecorator()` on `Route` for route-level decorators
+- Use `addResponseDecorator()` on `Router` for global response decorators
+- Replace default `ApplicationStrategy` via config for custom response handling, including adding global decorators to the strategy instance.
 
 ## Key Conventions
 

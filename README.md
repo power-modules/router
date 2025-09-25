@@ -159,6 +159,11 @@ class AdminModule implements PowerModule, HasRoutes, HasMiddleware
 - **Route-Level**: Applied to specific routes only
 - **Resolution Priority**: Module container first, then router container
 
+### Response Transformation
+- **Global Decorators**: Applied to all responses
+- **Module-Level Decorators**: Via `HasResponseDecorators` interface
+- **Route-Level Decorators**: Fluent API on `Route` definitions
+
 ## 🚀 Features
 
 ### Route Definition
@@ -178,13 +183,25 @@ Route::post('/orders', OrderController::class)
 ```
 
 ### Response Decorators
+The router supports response decorators at three levels: global, module, and route.
+
 ```php
-// Add global response transformations
-$router->addResponseDecorator(function (ResponseInterface $response): ResponseInterface {
-    return $response
-        ->withHeader('X-API-Version', '1.0')
-        ->withHeader('X-Powered-By', 'Power-Modules');
-});
+// 1. Global Decorator (applied to all routes)
+$router->addResponseDecorator(fn(ResponseInterface $r) => $r->withHeader('X-Global', 'true'));
+
+// 2. Module-Level Decorator (applied to all routes in a module)
+class UserModule implements PowerModule, HasRoutes, HasResponseDecorators
+{
+    public function getResponseDecorators(): array
+    {
+        return [fn(ResponseInterface $r) => $r->withHeader('X-Module', 'true')];
+    }
+    // ...
+}
+
+// 3. Route-Level Decorator (applied to a single route)
+Route::get('/profile', UserController::class)
+    ->addResponseDecorator(fn(ResponseInterface $r) => $r->withHeader('X-Route', 'true'));
 ```
 
 ### Configuration System
@@ -226,7 +243,7 @@ make devcontainer # Build Docker development container
 
 ### Extension Points
 - **Custom Strategies**: Replace default request/response handling
-- **Response Decorators**: Global response transformations
+- **Response Decorators**: Global, module-level, and route-level response transformations
 - **Middleware Stacks**: Composable request/response processing
 - **Route Prefixes**: Custom URL organization patterns
 

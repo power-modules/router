@@ -4,19 +4,22 @@ Advanced routing patterns and optimization techniques for the Modular Router.
 
 ## Response Decorators
 
-Transform responses globally without modifying individual controllers:
+Response decorators allow you to transform `ResponseInterface` objects at different levels of the application, providing a powerful way to manage headers, cookies, and other response attributes consistently.
+
+### Global Decorators
+
+Global decorators are applied to every response handled by the router. They are ideal for cross-cutting concerns like adding security headers, API versioning, or performance metrics.
+
+There are two ways to add global decorators: programmatically via the router interface or declaratively via the configuration file.
+
+#### Programmatic Registration
+
+You can add decorators directly to the router instance, which is useful for dynamic decorators or when you have access to the application's service container.
 
 ```php
 $router = $app->get(ModularRouterInterface::class);
 
-// Add API versioning and metadata
-$router->addResponseDecorator(function (ResponseInterface $response): ResponseInterface {
-    return $response
-        ->withHeader('X-API-Version', 'v1.2.0')
-        ->withHeader('X-Powered-By', 'Power-Modules-Router');
-});
-
-// Add security headers
+// Add security headers to all responses
 $router->addResponseDecorator(function (ResponseInterface $response): ResponseInterface {
     return $response
         ->withHeader('X-Content-Type-Options', 'nosniff')
@@ -24,9 +27,84 @@ $router->addResponseDecorator(function (ResponseInterface $response): ResponseIn
 });
 ```
 
+#### Configuration-Based Registration
+
+For static, application-wide decorators, adding them via the configuration is a cleaner approach. You can instantiate a strategy, add decorators to it, and then provide it to the router.
+
+```php
+// config/modular_router.php
+use Laminas\Diactoros\ResponseFactory;
+use League\Route\Strategy\JsonStrategy;
+use Modular\Router\Config\Config;
+use Modular\Router\Config\Setting;
+use Psr\Http\Message\ResponseInterface;
+
+$strategy = new JsonStrategy(new ResponseFactory());
+
+// Add global decorators directly to the strategy
+$strategy->addResponseDecorator(fn(ResponseInterface $r): ResponseInterface => $r->withHeader('X-API-Version', '1.0'));
+$strategy->addResponseDecorator(fn(ResponseInterface $r): ResponseInterface => $r->withHeader('X-Powered-By', 'Power-Modules'));
+
+return Config::create()
+    ->set(Setting::Strategy, $strategy);
+```
+
+> **Note:** For a cleaner and more reusable approach, you can also encapsulate global decorators within a custom strategy class. See [Custom Strategy with Pre-configured Decorators](#custom-strategy-with-pre-configured-decorators) for details.
+
+### Module-Level Decorators
+
+Modules can provide their own response decorators by implementing the `HasResponseDecorators` interface. These decorators are applied only to routes defined within that module, making them perfect for module-specific headers or transformations.
+
+```php
+use Modular\Router\Contract\HasResponseDecorators;
+use Psr\Http\Message\ResponseInterface;
+
+class UserApiModule implements PowerModule, HasRoutes, HasResponseDecorators
+{
+    public function getResponseDecorators(): array
+    {
+        // This header will only be added to routes in UserApiModule
+        return [
+            fn(ResponseInterface $r): ResponseInterface => $r->withHeader('X-Module-Scope', 'User-API')
+        ];
+    }
+
+    public function getRoutes(): array
+    {
+        return [
+            Route::get('/users', UserController::class), // Gets X-Module-Scope header
+        ];
+    }
+    // ...
+}
+```
+
+### Route-Level Decorators
+
+For maximum granularity, decorators can be applied directly to a specific route using a fluent API. This is useful for adding conditional headers or metadata to a single endpoint.
+
+```php
+use Psr\Http\Message\ResponseInterface;
+
+Route::get('/profile', UserController::class)
+    ->addResponseDecorator(
+        fn(ResponseInterface $r): ResponseInterface => $r->withHeader('X-Cache-Control', 'no-cache')
+    );
+```
+
+### Decorator Execution Order
+
+Decorators are executed in an "inside-out" order, allowing for predictable response transformations. The order of application is as follows:
+
+1.  **Global Decorators**: Applied first.
+2.  **Module Decorators**: Applied second.
+3.  **Route Decorators**: Applied last.
+
+This order means that route-specific decorators can act on a response that has already been modified by global and module-level decorators, giving them the final say on the response content and headers.
+
 ## Custom Router Strategies
 
-Override the default League/Route strategy for specialized routing behavior:
+Override the default strategy for specialized routing behavior:
 
 ```php
 // config/modular_router.php
@@ -38,6 +116,52 @@ use Modular\Router\Config\Setting;
 return Config::create()
     ->set(Setting::Strategy, new JsonStrategy(new ResponseFactory()));
 ```
+
+### Custom Strategy with Pre-configured Decorators
+
+For an even cleaner and more reusable approach, you can create a custom strategy class that extends one of the base strategies and adds your global decorators within its constructor. This encapsulates your application's default response policies in a single, testable class.
+
+First, define your custom strategy:
+
+```php
+// src/Http/Strategy/MyApiStrategy.php
+namespace MyApp\Http\Strategy;
+
+use League\Route\Strategy\JsonStrategy;
+use Psr\Http\Message\ResponseInterface;
+use Laminas\Diactoros\ResponseFactory;
+
+class MyApiStrategy extends JsonStrategy
+{
+    public function __construct()
+    {
+        // Parent constructor requires a response factory
+        parent::__construct(new ResponseFactory());
+
+        // Add your global decorators here
+        $this->addResponseDecorator(
+            fn(ResponseInterface $r): ResponseInterface => $r->withHeader('X-API-Version', '1.0')
+        );
+        $this->addResponseDecorator(
+            fn(ResponseInterface $r): ResponseInterface => $r->withHeader('X-Powered-By', 'MyApp')
+        );
+    }
+}
+```
+
+Then, register it in your configuration:
+
+```php
+// config/modular_router.php
+use Modular\Router\Config\Config;
+use Modular\Router\Config\Setting;
+use MyApp\Http\Strategy\MyApiStrategy;
+
+return Config::create()
+    ->set(Setting::Strategy, new MyApiStrategy());
+```
+
+This pattern keeps your configuration file minimal and centralizes your global response logic.
 
 ### Custom Strategy for API Responses
 

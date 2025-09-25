@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Modular\Router;
 
 use Modular\Router\Contract\HasMiddleware;
+use Modular\Router\Contract\HasResponseDecorators;
+use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Server\MiddlewareInterface;
 
 /**
@@ -18,12 +20,17 @@ use Psr\Http\Server\MiddlewareInterface;
  *
  * For enhanced compatibility, the specified controller name may implement the PSR-15 RequestHandlerInterface.
  */
-class Route implements HasMiddleware
+class Route implements HasMiddleware, HasResponseDecorators
 {
     /**
      * @var array<class-string<MiddlewareInterface>>
      */
     private array $middleware = [];
+
+    /**
+     * @var array<callable(ResponseInterface):ResponseInterface>
+     */
+    private array $responseDecorators = [];
 
     public function __construct(
         public readonly string $path,
@@ -77,5 +84,17 @@ class Route implements HasMiddleware
     public function getMiddleware(): array
     {
         return $this->middleware;
+    }
+
+    public function addResponseDecorator(callable $responseDecorator): self
+    {
+        $this->responseDecorators[] = $responseDecorator;
+
+        return $this;
+    }
+
+    public function getResponseDecorators(): array
+    {
+        return $this->responseDecorators;
     }
 }

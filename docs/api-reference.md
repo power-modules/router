@@ -81,6 +81,33 @@ class AdminModule implements PowerModule, HasRoutes, HasMiddleware
 // Middleware runs before all /admin/* routes
 ```
 
+### HasResponseDecorators
+Interface for modules that provide response decorators. See [Advanced Patterns](advanced-patterns.md#response-decorators) for detailed usage.
+
+```php
+interface HasResponseDecorators
+{
+    /**
+     * @return array<callable(ResponseInterface):ResponseInterface>
+     */
+    public function getResponseDecorators(): array;
+}
+```
+
+**Example**:
+```php
+class UserModule implements PowerModule, HasRoutes, HasResponseDecorators
+{
+    public function getResponseDecorators(): array
+    {
+        // This decorator is applied to all routes in this module
+        return [
+            fn(ResponseInterface $r): ResponseInterface => $r->withHeader('X-User-Module', 'true')
+        ];
+    }
+}
+```
+
 ## Route Class
 
 Create HTTP routes with method-specific factories.
@@ -111,6 +138,10 @@ Route::get('/posts/{slug:[a-z-]+}', PostController::class);     // Custom regex
 // Route middleware
 Route::post('/orders', OrderController::class)
     ->addMiddleware(AuthMiddleware::class, ValidationMiddleware::class);
+
+// Route-level response decorators
+Route::get('/profile', UserController::class)
+    ->addResponseDecorator(fn($r) => $r->withHeader('X-Cache-Control', 'no-cache'));
 ```
 
 ## Router Interface
@@ -138,7 +169,7 @@ interface ModularRouterInterface extends RequestHandlerInterface
 // Get router from DI container
 $router = $app->get(ModularRouterInterface::class);
 
-// Add global response decorators
+// Add global response decorators programmatically
 $router->addResponseDecorator(function (ResponseInterface $response): ResponseInterface {
     return $response->withHeader('X-API-Version', '1.0');
 });
@@ -149,27 +180,7 @@ $response = $router->handle($serverRequest);
 
 ## Response Decorators
 
-Global response transformations applied to all responses.
-
-**Common Examples**:
-```php
-// API versioning
-$router->addResponseDecorator(fn($res) => $res->withHeader('X-API-Version', 'v1.2'));
-
-// CORS headers
-$router->addResponseDecorator(function (ResponseInterface $response): ResponseInterface {
-    return $response
-        ->withHeader('Access-Control-Allow-Origin', '*')
-        ->withHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
-});
-
-// Security headers
-$router->addResponseDecorator(function (ResponseInterface $response): ResponseInterface {
-    return $response
-        ->withHeader('X-Content-Type-Options', 'nosniff')
-        ->withHeader('X-Frame-Options', 'DENY');
-});
-```
+The router supports response decorators at three levels: global, module-level, and route-level. For detailed examples and execution order, see the [Response Decorators](advanced-patterns.md#response-decorators) section in the advanced patterns guide.
 
 ## Configuration
 
@@ -191,8 +202,13 @@ use Laminas\Diactoros\ResponseFactory;
 use Modular\Router\Config\Config;
 use Modular\Router\Config\Setting;
 
+$strategy = new JsonStrategy(new ResponseFactory());
+
+// Add global decorators directly to the strategy
+$strategy->addResponseDecorator(fn($r) => $r->withHeader('X-API-Version', '1.0'));
+
 return Config::create()
-    ->set(Setting::Strategy, new JsonStrategy(new ResponseFactory()));
+    ->set(Setting::Strategy, $strategy);
 ```
 
 ## Module Setup

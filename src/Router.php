@@ -14,6 +14,7 @@ use Modular\Framework\Container\ConfigurableContainerInterface;
 use Modular\Framework\Container\InstanceResolver\InstanceViaContainerResolver;
 use Modular\Framework\PowerModule\Contract\PowerModule;
 use Modular\Router\Contract\HasMiddleware;
+use Modular\Router\Contract\HasResponseDecorators;
 use Modular\Router\Contract\HasRoutes;
 use Modular\Router\Contract\ModularRouterInterface;
 use Psr\Container\ContainerInterface;
@@ -27,7 +28,7 @@ class Router implements ModularRouterInterface
     private RouteGroupPrefixResolver $routeGroupPrefixResolver;
 
     public function __construct(
-        StrategyInterface $strategy,
+        private readonly StrategyInterface $strategy, // This strategy will be used as a prototype for each module's route group
     ) {
         $this->container = new ConfigurableContainer();
         $this->router = new LeagueRouter();
@@ -52,17 +53,27 @@ class Router implements ModularRouterInterface
         ContainerInterface $moduleContainer,
     ): void {
         if (!$powerModule instanceof HasRoutes) {
+            // Check only for HasRoutes here; HasResponseDecorators makes sense only in combination with routes
             return;
         }
 
-        $routeGroup = $this->router->group(
+        $moduleRouteGroup = $this->router->group(
             $this->routeGroupPrefixResolver->getRouteGroupPrefix($powerModule),
             fn (RouteGroup $routeGroup) => $this->registerRoutes($routeGroup, $powerModule, $moduleContainer),
         );
 
         // Modules can implement HasMiddleware to add middleware to the entire route group
         if ($powerModule instanceof HasMiddleware) {
-            $this->registerMiddlewares($routeGroup, $powerModule, $moduleContainer);
+            $this->registerMiddlewares($moduleRouteGroup, $powerModule, $moduleContainer);
+        }
+
+        // Modules can implement HasResponseDecorators to add response decorators to the entire route group (e.g. /library-a/**)
+        if ($powerModule instanceof HasResponseDecorators) {
+            // Clone the strategy to avoid affecting other modules
+            $moduleRouteGroupStrategy = clone $this->strategy;
+            $moduleRouteGroup->setStrategy($moduleRouteGroupStrategy);
+
+            $this->registerResponseDecorators($moduleRouteGroupStrategy, $powerModule);
         }
     }
 
@@ -72,12 +83,12 @@ class Router implements ModularRouterInterface
     }
 
     private function registerRoutes(
-        RouteGroup $routeGroup,
+        RouteGroup $moduleRouteGroup,
         HasRoutes $hasRoutes,
         ContainerInterface $moduleContainer,
     ): void {
         foreach ($hasRoutes->getRoutes() as $modularRoute) {
-            $leagueRoute = $routeGroup->map(
+            $leagueRoute = $moduleRouteGroup->map(
                 $modularRoute->method->value,
                 $modularRoute->path,
                 [
@@ -89,6 +100,17 @@ class Router implements ModularRouterInterface
             $this->registerMiddlewares($leagueRoute, $modularRoute, $moduleContainer);
 
             /**
+             * League Route's Strategy inherits its group strategy, making a single route decorator applicable for all routes, which is not desired.
+             * Therefore, we need to clone the original route strategy (which is essentially the group strategy) for each route to isolate decorators.
+             * The group strategy is only set if the module implements HasResponseDecorators.
+             *
+             * @see \League\Route\RouteGroup line 68
+             */
+            $routeStrategy = clone ($leagueRoute->getStrategy() ?? $this->strategy);
+            $leagueRoute->setStrategy($routeStrategy);
+            $this->registerResponseDecorators($routeStrategy, $modularRoute);
+
+            /**
              * Register controller with the InstanceViaContainerResolver, so it can be resolved via the module container.
              *
              * Controllers are registered using their fully qualified class name as the key (e.g., App\User\UserController).
@@ -97,7 +119,7 @@ class Router implements ModularRouterInterface
              *
              * Different namespaces prevent controller class conflicts naturally. If modules intentionally share
              * the same controller class (same fully qualified name), the last registration will be used,
-             * which is typically acceptable for shared components.
+             * which is typically acceptable for shared components, just make sure it has all required dependencies.
              *
              * @see \Modular\Router\Route
              * @see \Modular\Framework\Container\InstanceResolver\InstanceViaContainerResolver
@@ -123,6 +145,15 @@ class Router implements ModularRouterInterface
             // All we need to do is register the class names in the root container with reference to the module container
             $this->container->set($middlewareClassName, $moduleContainer, InstanceViaContainerResolver::class);
             $middlewareAwareInterface->lazyMiddleware($middlewareClassName);
+        }
+    }
+
+    private function registerResponseDecorators(
+        StrategyInterface $strategy,
+        HasResponseDecorators $hasResponseDecorators,
+    ): void {
+        foreach ($hasResponseDecorators->getResponseDecorators() as $responseDecorator) {
+            $strategy->addResponseDecorator($responseDecorator);
         }
     }
 }

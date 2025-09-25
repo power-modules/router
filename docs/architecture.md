@@ -91,14 +91,18 @@ Middleware resolution follows a clear precedence hierarchy:
 
 ```
 Request → Module Middleware → Route Middleware → Controller
-                ↑                   ↑
-          Module Container    Router Container
 ```
 
 This design allows for:
 - **Module-level concerns** (authentication, logging, CORS)
 - **Route-specific concerns** (validation, rate limiting)
 - **Flexible composition** of middleware stacks
+
+### Response Decorator Chain
+
+Response decorators are applied in a predictable "inside-out" order after the controller generates a response, allowing for composable response transformations at multiple levels (global, module, and route).
+
+For detailed information about decorator execution order and practical usage patterns, see the [Response Decorators section in Advanced Patterns](advanced-patterns.md#response-decorators).
 
 ### Lazy Middleware Resolution Strategy
 
@@ -256,28 +260,30 @@ Module registration order has minimal impact:
 
 ## Extension Points
 
+The router's behavior can be customized through several key extension points, allowing for advanced and specialized use cases.
+
 ### Custom Strategies
 
-Replace the default League/Route strategy for specialized behavior:
+Replace the default League/Route strategy to implement specialized behavior for your entire application. This is ideal for:
 - JSON-first APIs
-- GraphQL endpoints  
+- GraphQL endpoints
 - Custom authentication flows
 - Specialized error handling
 
 ### Response Decorators
 
-Add global response transformations:
-- CORS headers for browser APIs
-- Security headers for all responses
-- Performance tracking and metrics
-- API versioning information
+Add global, module-level, or route-level response transformations. This pattern is perfect for:
+- Adding CORS headers for browser APIs
+- Injecting security headers (e.g., `X-Frame-Options`, `Content-Security-Policy`)
+- Tracking performance metrics and adding timing headers
+- Implementing API versioning in headers
 
 ### Middleware Composition
 
-Create sophisticated middleware stacks:
+Create sophisticated, layered middleware stacks to handle cross-cutting concerns like:
 - Authentication and authorization
 - Request/response logging
 - Rate limiting and throttling
 - Content negotiation
 
-For detailed API documentation and implementation examples, see the [API Reference](api-reference.md).
+For detailed API documentation and implementation examples, see the [API Reference](api-reference.md) and [Advanced Patterns](advanced-patterns.md).

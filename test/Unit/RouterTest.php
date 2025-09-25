@@ -55,6 +55,33 @@ class RouterTest extends TestCase
         );
     }
 
+    public function testRouterCanRegisterRouteResponseDecorators(): void
+    {
+        $rootContainer = new ConfigurableContainer();
+        $router = $this->getRouter($rootContainer, [LibraryAModule::class]);
+        $response = $router->handle($this->getRequest('/library-a/feature-a'));
+        self::assertSame('true', $response->getHeaderLine('X-Library-A-Route'));
+
+        $response = $router->handle($this->getRequest('/library-a/feature-b'));
+        self::assertSame('', $response->getHeaderLine('X-Library-A-Route'));
+    }
+
+    public function testRouterCanRegisterModuleResponseDecorators(): void
+    {
+        $rootContainer = new ConfigurableContainer();
+        $router = $this->getRouter($rootContainer, [LibraryAModule::class]);
+        $response = $router->handle($this->getRequest('/library-a/feature-a'));
+        self::assertSame('true', $response->getHeaderLine('X-Library-A-Static'));
+        self::assertSame('true', $response->getHeaderLine('X-Library-A-Closure'));
+        self::assertSame('true', $response->getHeaderLine('X-Library-A-Basic'));
+
+        $response = $router->handle($this->getRequest('/library-a/feature-b'));
+        self::assertSame('', $response->getHeaderLine('X-Library-A-Route'));
+        self::assertSame('true', $response->getHeaderLine('X-Library-A-Static'));
+        self::assertSame('true', $response->getHeaderLine('X-Library-A-Closure'));
+        self::assertSame('true', $response->getHeaderLine('X-Library-A-Basic'));
+    }
+
     public function testRouterThrowsExceptionForUnknownMiddleware(): void
     {
         $this->expectException(ServiceDefinitionNotFound::class);
