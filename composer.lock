@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "4da1f17750aef6ecb65aa3b639498362",
+    "content-hash": "13ef9d82607955bc93e4508e4d47f14c",
     "packages": [
         {
             "name": "laravel/serializable-closure",
@@ -209,16 +209,16 @@
         },
         {
             "name": "power-modules/framework",
-            "version": "v1.1.1",
+            "version": "v2.0.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/power-modules/framework.git",
-                "reference": "78c8c54460db4648913c5b97da105de15930c2d2"
+                "reference": "51434da5c91976925210dfeade95730ccd999d9d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/power-modules/framework/zipball/78c8c54460db4648913c5b97da105de15930c2d2",
-                "reference": "78c8c54460db4648913c5b97da105de15930c2d2",
+                "url": "https://api.github.com/repos/power-modules/framework/zipball/51434da5c91976925210dfeade95730ccd999d9d",
+                "reference": "51434da5c91976925210dfeade95730ccd999d9d",
                 "shasum": ""
             },
             "require": {
@@ -248,23 +248,26 @@
                     "role": "Owner"
                 }
             ],
-            "description": "A powerful modular PHP framework with encapsulated modules, each having its own DI container and explicit import/export mechanisms",
+            "description": "Framework for building modular PHP applications and plugin ecosystems with encapsulated modules and PowerModuleSetup extensions",
             "keywords": [
                 "component-based",
                 "dependency-injection",
                 "di-container",
+                "ecosystem",
                 "encapsulation",
                 "framework",
                 "microservices",
                 "modular",
                 "modular-architecture",
-                "power-modules"
+                "plugin-system",
+                "power-modules",
+                "powermodulesetup"
             ],
             "support": {
                 "issues": "https://github.com/power-modules/framework/issues",
-                "source": "https://github.com/power-modules/framework/tree/v1.1.1"
+                "source": "https://github.com/power-modules/framework/tree/v2.0.0"
             },
-            "time": "2025-09-21T20:03:52+00:00"
+            "time": "2025-09-25T18:56:54+00:00"
         },
         {
             "name": "psr/container",

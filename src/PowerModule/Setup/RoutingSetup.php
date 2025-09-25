@@ -2,13 +2,13 @@
 
 namespace Modular\Router\PowerModule\Setup;
 
-use Modular\Framework\PowerModule\Contract\CanSetupPowerModule;
+use Modular\Framework\PowerModule\Contract\PowerModuleSetup;
 use Modular\Framework\PowerModule\Setup\PowerModuleSetupDto;
 use Modular\Framework\PowerModule\Setup\SetupPhase;
 use Modular\Router\Contract\HasRoutes;
 use Modular\Router\Contract\ModularRouterInterface;
 
-class RoutingSetup implements CanSetupPowerModule
+class RoutingSetup implements PowerModuleSetup
 {
     public function setup(PowerModuleSetupDto $powerModuleSetupDto): void
     {
