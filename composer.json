@@ -42,7 +42,7 @@
     "require": {
         "php": "^8.4",
         "league/route": "^6.2",
-        "power-modules/framework": "^2"
+        "power-modules/framework": "^2.1"
     },
     "require-dev": {
         "phpunit/phpunit": "^12.3",

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "13ef9d82607955bc93e4508e4d47f14c",
+    "content-hash": "60b652d956df9965d598c9ead08f8aa7",
     "packages": [
         {
             "name": "laravel/serializable-closure",
@@ -209,16 +209,16 @@
         },
         {
             "name": "power-modules/framework",
-            "version": "v2.0.0",
+            "version": "v2.1.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/power-modules/framework.git",
-                "reference": "51434da5c91976925210dfeade95730ccd999d9d"
+                "reference": "6403b5e4c825812241a90f8e3fd48310b57d6573"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/power-modules/framework/zipball/51434da5c91976925210dfeade95730ccd999d9d",
-                "reference": "51434da5c91976925210dfeade95730ccd999d9d",
+                "url": "https://api.github.com/repos/power-modules/framework/zipball/6403b5e4c825812241a90f8e3fd48310b57d6573",
+                "reference": "6403b5e4c825812241a90f8e3fd48310b57d6573",
                 "shasum": ""
             },
             "require": {
@@ -265,9 +265,9 @@
             ],
             "support": {
                 "issues": "https://github.com/power-modules/framework/issues",
-                "source": "https://github.com/power-modules/framework/tree/v2.0.0"
+                "source": "https://github.com/power-modules/framework/tree/v2.1.2"
             },
-            "time": "2025-09-25T18:56:54+00:00"
+            "time": "2025-10-23T18:49:09+00:00"
         },
         {
             "name": "psr/container",
