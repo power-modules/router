@@ -65,6 +65,16 @@ class Route implements HasMiddleware, HasResponseDecorators
         return new self($path, $controllerName, $controllerMethodName, RouteMethod::Patch);
     }
 
+    public static function options(string $path, string $controllerName, string $controllerMethodName = 'handle'): self
+    {
+        return new self($path, $controllerName, $controllerMethodName, RouteMethod::Options);
+    }
+
+    public static function head(string $path, string $controllerName, string $controllerMethodName = 'handle'): self
+    {
+        return new self($path, $controllerName, $controllerMethodName, RouteMethod::Head);
+    }
+
     public function addMiddleware(string ...$middlewareClassNames): self
     {
         foreach ($middlewareClassNames as $middlewareClassName) {
