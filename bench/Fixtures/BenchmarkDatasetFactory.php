@@ -10,6 +10,17 @@ use Modular\Router\Route;
 final class BenchmarkDatasetFactory
 {
     /**
+     * @var list<string>
+     */
+    private const STATIC_METHOD_SEQUENCE = [
+        'GET',
+        'POST',
+        'PUT',
+        'PATCH',
+        'DELETE',
+    ];
+
+    /**
      * @var array<string,int>
      */
     private const MIXED_REQUEST_GROUP_WEIGHTS = [
@@ -24,9 +35,9 @@ final class BenchmarkDatasetFactory
      */
     private const SIZE_TO_ROUTE_TARGET = [
         'small' => 100,
-        'medium' => 1000,
-        'large' => 10000,
-        'xlarge' => 50000,
+        'medium' => 500,
+        'large' => 2500,
+        'xlarge' => 5000,
     ];
 
     /**
@@ -35,10 +46,13 @@ final class BenchmarkDatasetFactory
     public static function supportedDatasets(): array
     {
         return [
+            'static-flat',
+            'modular-static',
             'shared-prefix-dynamic',
+            'low-shared-prefix-dynamic',
+            'constrained-placeholders',
             'mixed-modules',
             'precedence',
-            'constrained-placeholders',
         ];
     }
 
@@ -59,12 +73,103 @@ final class BenchmarkDatasetFactory
         }
 
         return match ($datasetName) {
+            'static-flat' => self::buildStaticFlat($size, $routeTarget),
+            'modular-static' => self::buildModularStatic($size, $routeTarget),
             'shared-prefix-dynamic' => self::buildSharedPrefixDynamic($size, $routeTarget),
+            'low-shared-prefix-dynamic' => self::buildLowSharedPrefixDynamic($size, $routeTarget),
+            'constrained-placeholders' => self::buildConstrainedPlaceholders($size, $routeTarget),
             'mixed-modules' => self::buildMixedModules($size, $routeTarget),
             'precedence' => self::buildPrecedence($size, $routeTarget),
-            'constrained-placeholders' => self::buildConstrainedPlaceholders($size, $routeTarget),
             default => throw new InvalidArgumentException(sprintf('Unsupported dataset "%s"', $datasetName)),
         };
+    }
+
+    private static function buildStaticFlat(string $size, int $routeTarget): BenchmarkDataset
+    {
+        $routes = [];
+        $hitRequests = [];
+        $methodNotAllowedRequests = [];
+        $headFallbackRequests = [];
+        $notFoundRequests = [];
+
+        for ($index = 1; $index <= $routeTarget; $index++) {
+            $method = self::STATIC_METHOD_SEQUENCE[($index - 1) % count(self::STATIC_METHOD_SEQUENCE)];
+            $path = '/item-' . $index;
+            $uri = '/catalog/item-' . $index;
+
+            $routes[] = self::buildRoute($method, $path);
+            $hitRequests[] = ['method' => $method, 'uri' => $uri];
+            $methodNotAllowedRequests[] = ['method' => self::buildMethodNotAllowedMethod($method), 'uri' => $uri];
+            $notFoundRequests[] = ['method' => $method, 'uri' => '/catalog/missing-item-' . $index];
+
+            if ($method === 'GET') {
+                $headFallbackRequests[] = ['method' => 'HEAD', 'uri' => $uri];
+            }
+        }
+
+        return new BenchmarkDataset(
+            name: 'static-flat',
+            size: $size,
+            routeCount: count($routes),
+            modules: [new SyntheticModule('/catalog', $routes)],
+            requestSpecsByGroup: self::withMixedRequestGroup([
+                'hit' => self::sliceRequests($hitRequests),
+                'not-found' => self::sliceRequests($notFoundRequests),
+                'method-not-allowed' => self::sliceRequests($methodNotAllowedRequests),
+                'head-fallback' => self::sliceRequests($headFallbackRequests),
+            ]),
+        );
+    }
+
+    private static function buildModularStatic(string $size, int $routeTarget): BenchmarkDataset
+    {
+        $routesPerModule = 10;
+        $moduleCount = max(1, (int) ceil($routeTarget / $routesPerModule));
+        $modules = [];
+        $hitRequests = [];
+        $methodNotAllowedRequests = [];
+        $headFallbackRequests = [];
+        $notFoundRequests = [];
+        $routeCount = 0;
+        $globalRouteIndex = 1;
+
+        for ($moduleIndex = 1; $moduleIndex <= $moduleCount && $globalRouteIndex <= $routeTarget; $moduleIndex++) {
+            $slug = sprintf('/module-%03d', $moduleIndex);
+            $routes = [];
+
+            for ($routeIndex = 1; $routeIndex <= $routesPerModule && $globalRouteIndex <= $routeTarget; $routeIndex++, $globalRouteIndex++) {
+                $method = self::STATIC_METHOD_SEQUENCE[($globalRouteIndex - 1) % count(self::STATIC_METHOD_SEQUENCE)];
+                $basePath = $routeIndex % 2 === 0
+                    ? '/admin/feature-' . $globalRouteIndex
+                    : '/feature-' . $globalRouteIndex;
+                $uri = $slug . $basePath;
+
+                $routes[] = self::buildRoute($method, $basePath);
+                $hitRequests[] = ['method' => $method, 'uri' => $uri];
+                $methodNotAllowedRequests[] = ['method' => self::buildMethodNotAllowedMethod($method), 'uri' => $uri];
+                $notFoundRequests[] = ['method' => $method, 'uri' => $slug . '/missing/feature-' . $globalRouteIndex];
+
+                if ($method === 'GET') {
+                    $headFallbackRequests[] = ['method' => 'HEAD', 'uri' => $uri];
+                }
+            }
+
+            $routeCount += count($routes);
+            $modules[] = new SyntheticModule($slug, $routes);
+        }
+
+        return new BenchmarkDataset(
+            name: 'modular-static',
+            size: $size,
+            routeCount: $routeCount,
+            modules: $modules,
+            requestSpecsByGroup: self::withMixedRequestGroup([
+                'hit' => self::sliceRequests($hitRequests),
+                'not-found' => self::sliceRequests($notFoundRequests),
+                'method-not-allowed' => self::sliceRequests($methodNotAllowedRequests),
+                'head-fallback' => self::sliceRequests($headFallbackRequests),
+            ]),
+        );
     }
 
     private static function buildSharedPrefixDynamic(string $size, int $routeTarget): BenchmarkDataset
@@ -94,6 +199,68 @@ final class BenchmarkDatasetFactory
             modules: [new SyntheticModule('/blog', $routes)],
             requestSpecsByGroup: self::withMixedRequestGroup([
                 'hit' => $hitRequests,
+                'not-found' => self::sliceRequests($notFoundRequests),
+                'method-not-allowed' => self::sliceRequests($methodNotAllowedRequests),
+                'head-fallback' => self::sliceRequests($headFallbackRequests),
+            ]),
+        );
+    }
+
+    private static function buildLowSharedPrefixDynamic(string $size, int $routeTarget): BenchmarkDataset
+    {
+        $routesPerModule = 4;
+        $moduleCount = max(1, (int) ceil($routeTarget / $routesPerModule));
+        $modules = [];
+        $hitRequests = [];
+        $methodNotAllowedRequests = [];
+        $headFallbackRequests = [];
+        $notFoundRequests = [];
+        $routeCount = 0;
+
+        for ($moduleIndex = 1; $moduleIndex <= $moduleCount; $moduleIndex++) {
+            $slug = sprintf('/dynamic-%04d', $moduleIndex);
+            $routes = [
+                Route::get('/alpha/{id}/open', BenchmarkController::class),
+                Route::post('/beta/{slug}/publish', BenchmarkController::class),
+                Route::delete('/gamma/{uuid}/archive', BenchmarkController::class),
+                Route::get('/delta/{user}/settings/{setting}', BenchmarkController::class),
+            ];
+
+            $modules[] = new SyntheticModule($slug, $routes);
+            $routeCount += count($routes);
+
+            $id = (string) $moduleIndex;
+            $slugValue = 'article-' . $moduleIndex;
+            $uuidValue = 'uuid-' . $moduleIndex;
+            $userValue = 'user-' . $moduleIndex;
+            $settingValue = 'setting-' . $moduleIndex;
+
+            $hitRequests[] = ['method' => 'GET', 'uri' => $slug . '/alpha/' . $id . '/open'];
+            $hitRequests[] = ['method' => 'POST', 'uri' => $slug . '/beta/' . $slugValue . '/publish'];
+            $hitRequests[] = ['method' => 'DELETE', 'uri' => $slug . '/gamma/' . $uuidValue . '/archive'];
+            $hitRequests[] = ['method' => 'GET', 'uri' => $slug . '/delta/' . $userValue . '/settings/' . $settingValue];
+
+            $methodNotAllowedRequests[] = ['method' => 'POST', 'uri' => $slug . '/alpha/' . $id . '/open'];
+            $methodNotAllowedRequests[] = ['method' => 'GET', 'uri' => $slug . '/beta/' . $slugValue . '/publish'];
+            $methodNotAllowedRequests[] = ['method' => 'GET', 'uri' => $slug . '/gamma/' . $uuidValue . '/archive'];
+            $methodNotAllowedRequests[] = ['method' => 'DELETE', 'uri' => $slug . '/delta/' . $userValue . '/settings/' . $settingValue];
+
+            $headFallbackRequests[] = ['method' => 'HEAD', 'uri' => $slug . '/alpha/' . $id . '/open'];
+            $headFallbackRequests[] = ['method' => 'HEAD', 'uri' => $slug . '/delta/' . $userValue . '/settings/' . $settingValue];
+
+            $notFoundRequests[] = ['method' => 'GET', 'uri' => $slug . '/alpha/' . $id . '/close'];
+            $notFoundRequests[] = ['method' => 'POST', 'uri' => $slug . '/beta/' . $slugValue . '/draft'];
+            $notFoundRequests[] = ['method' => 'DELETE', 'uri' => $slug . '/gamma/' . $uuidValue . '/restore'];
+            $notFoundRequests[] = ['method' => 'GET', 'uri' => $slug . '/delta/' . $userValue . '/profile/' . $settingValue];
+        }
+
+        return new BenchmarkDataset(
+            name: 'low-shared-prefix-dynamic',
+            size: $size,
+            routeCount: $routeCount,
+            modules: $modules,
+            requestSpecsByGroup: self::withMixedRequestGroup([
+                'hit' => self::sliceRequests($hitRequests),
                 'not-found' => self::sliceRequests($notFoundRequests),
                 'method-not-allowed' => self::sliceRequests($methodNotAllowedRequests),
                 'head-fallback' => self::sliceRequests($headFallbackRequests),
@@ -330,6 +497,27 @@ final class BenchmarkDatasetFactory
             substr($hex, 16, 4),
             substr($hex, 20, 12),
         );
+    }
+
+    private static function buildRoute(string $method, string $path): Route
+    {
+        return match ($method) {
+            'GET' => Route::get($path, BenchmarkController::class),
+            'POST' => Route::post($path, BenchmarkController::class),
+            'PUT' => Route::put($path, BenchmarkController::class),
+            'PATCH' => Route::patch($path, BenchmarkController::class),
+            'DELETE' => Route::delete($path, BenchmarkController::class),
+            default => throw new InvalidArgumentException(sprintf('Unsupported route method "%s"', $method)),
+        };
+    }
+
+    private static function buildMethodNotAllowedMethod(string $method): string
+    {
+        return match ($method) {
+            'GET' => 'POST',
+            'POST', 'PUT', 'PATCH', 'DELETE' => 'GET',
+            default => throw new InvalidArgumentException(sprintf('Unsupported route method "%s"', $method)),
+        };
     }
 
     /**

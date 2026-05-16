@@ -15,12 +15,15 @@ It is intended to provide a reproducible baseline before the trie-based router w
 
 ## Datasets
 
-The current harness implements the first three datasets from the trie refactor plan:
+The current harness now implements the full dataset set from the trie refactor plan:
 
+- `static-flat`
+- `modular-static`
 - `shared-prefix-dynamic`
+- `low-shared-prefix-dynamic`
+- `constrained-placeholders`
 - `mixed-modules`
 - `precedence`
-- `constrained-placeholders`
 
 Supported sizes:
 
@@ -28,6 +31,13 @@ Supported sizes:
 - `medium`
 - `large`
 - `xlarge`
+
+Current route targets:
+
+- `small`: 100 routes
+- `medium`: 500 routes
+- `large`: 2,500 routes
+- `xlarge`: 5,000 routes
 
 ## Commands
 
@@ -43,6 +53,12 @@ Run a more stable benchmark with default iterations:
 make bench ARGS="--dataset=mixed-modules --size=medium"
 ```
 
+Run the full repeatable benchmark matrix and write the aggregated JSON snapshot:
+
+```bash
+make bench-matrix
+```
+
 List supported datasets and sizes:
 
 ```bash
@@ -53,6 +69,12 @@ Write JSON output to a file:
 
 ```bash
 php bench/run.php --dataset=precedence --size=small --output=bench/results/precedence-small.json --pretty
+```
+
+The matrix target writes `benchmark_results.json` by default. You can override the output path:
+
+```bash
+make bench-matrix BENCH_MATRIX_OUTPUT=bench/results/full-matrix.json
 ```
 
 ## Output
