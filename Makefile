@@ -1,4 +1,10 @@
-.PHONY: test codestyle phpstan devcontainer
+.PHONY: bench bench-quick test codestyle phpstan devcontainer
+
+bench:
+	php bench/run.php --pretty $(ARGS)
+
+bench-quick:
+	php bench/run.php --pretty --iterations=1 --warmup=0 --revs=1 $(ARGS)
 
 test:
 	vendor/bin/phpunit --color=always --no-coverage test/
