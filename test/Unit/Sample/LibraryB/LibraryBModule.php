@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modular\Router\Test\Unit\Sample\LibraryB;
 
 use Modular\Framework\Container\ConfigurableContainerInterface;

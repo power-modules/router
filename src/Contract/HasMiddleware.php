@@ -9,7 +9,7 @@ use Psr\Http\Server\MiddlewareInterface;
 interface HasMiddleware
 {
     /**
-     * @return array<class-string<MiddlewareInterface>>
+     * @return list<class-string<MiddlewareInterface>>
      */
     public function getMiddleware(): array;
 }

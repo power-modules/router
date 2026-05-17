@@ -22,11 +22,11 @@ final class RouteBuilderTest extends TestCase
 {
     public function testForCreatesInstanceWithDefaults(): void
     {
-        $builder = RouteBuilder::for('MyController');
+        $builder = RouteBuilder::for(self::class);
         $route = $builder->build();
 
         self::assertSame('/', $route->path);
-        self::assertSame('MyController', $route->controllerName);
+        self::assertSame(self::class, $route->controllerName);
         self::assertSame('__invoke', $route->controllerMethodName);
         self::assertSame(RouteMethod::Get, $route->method);
         self::assertEmpty($route->getMiddleware());
@@ -34,7 +34,7 @@ final class RouteBuilderTest extends TestCase
 
     public function testForWithMethodName(): void
     {
-        $builder = RouteBuilder::for('MyController', 'customMethod');
+        $builder = RouteBuilder::for(self::class, 'customMethod');
         $route = $builder->build();
 
         self::assertSame('customMethod', $route->controllerMethodName);
@@ -42,7 +42,7 @@ final class RouteBuilderTest extends TestCase
 
     public function testWithMethod(): void
     {
-        $builder = RouteBuilder::for('MyController')
+        $builder = RouteBuilder::for(self::class)
             ->withMethod(RouteMethod::Post);
         $route = $builder->build();
 
@@ -54,7 +54,7 @@ final class RouteBuilderTest extends TestCase
         $middleware1 = get_class($this->createMock(MiddlewareInterface::class));
         $middleware2 = get_class($this->createMock(MiddlewareInterface::class));
 
-        $builder = RouteBuilder::for('MyController')
+        $builder = RouteBuilder::for(self::class)
             ->withMiddleware($middleware1, $middleware2);
         $route = $builder->build();
 
@@ -63,7 +63,7 @@ final class RouteBuilderTest extends TestCase
 
     public function testAddPathWithStrings(): void
     {
-        $builder = RouteBuilder::for('MyController')
+        $builder = RouteBuilder::for(self::class)
             ->addPath('api', 'v1', 'users');
         $route = $builder->build();
 
@@ -72,7 +72,7 @@ final class RouteBuilderTest extends TestCase
 
     public function testAddPathWithEnum(): void
     {
-        $builder = RouteBuilder::for('MyController')
+        $builder = RouteBuilder::for(self::class)
             ->addPath('api', TestEnum::User);
         $route = $builder->build();
 
@@ -81,7 +81,7 @@ final class RouteBuilderTest extends TestCase
 
     public function testAddPathWithArrayOfEnums(): void
     {
-        $builder = RouteBuilder::for('MyController')
+        $builder = RouteBuilder::for(self::class)
             ->addPath('api', [TestEnum::User, TestEnum::Profile]);
         $route = $builder->build();
 

@@ -9,7 +9,7 @@ use Psr\Http\Message\ResponseInterface;
 interface HasResponseDecorators
 {
     /**
-     * @return array<callable(ResponseInterface):ResponseInterface>
+     * @return list<callable(ResponseInterface):ResponseInterface>
      */
     public function getResponseDecorators(): array;
 }

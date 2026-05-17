@@ -1,15 +1,19 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modular\Router\Test\Unit;
 
 use Laminas\Diactoros\ResponseFactory;
 use Laminas\Diactoros\ServerRequestFactory;
-use League\Route\Strategy\JsonStrategy;
 use Modular\Framework\Container\ConfigurableContainer;
 use Modular\Framework\Container\Exception\ServiceDefinitionNotFound;
 use Modular\Framework\PowerModule\Contract\PowerModule;
 use Modular\Router\Contract\ModularRouterInterface;
 use Modular\Router\Router;
+use Modular\Router\Strategy\JsonRouterStrategy;
+use Modular\Router\Test\Unit\Sample\DuplicateRoutes\DuplicateRoutesModule;
+use Modular\Router\Test\Unit\Sample\DynamicRoute\DynamicRouteModule;
 use Modular\Router\Test\Unit\Sample\LibraryA\LibraryAController;
 use Modular\Router\Test\Unit\Sample\LibraryA\LibraryAModule;
 use Modular\Router\Test\Unit\Sample\LibraryA\ModuleMiddlewareA;
@@ -92,6 +96,40 @@ class RouterTest extends TestCase
         $router->handle($this->getRequest('/already-has-slash/no-middleware', 'GET'));
     }
 
+    public function testRouterRejectsDuplicateRoutesDuringRegistration(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Duplicate route registration for [GET] /duplicate-routes/users');
+
+        $module = new DuplicateRoutesModule();
+        $moduleContainer = new ConfigurableContainer();
+        $module->register($moduleContainer);
+
+        $router = new Router(
+            new JsonRouterStrategy(new ResponseFactory()),
+        );
+
+        $router->registerPowerModuleRoutes($module, $moduleContainer);
+    }
+
+    public function testRouterCanRegisterBasicDynamicPlaceholderRoute(): void
+    {
+        $module = new DynamicRouteModule();
+        $moduleContainer = new ConfigurableContainer();
+        $module->register($moduleContainer);
+
+        $router = new Router(
+            new JsonRouterStrategy(new ResponseFactory()),
+        );
+
+        $router->registerPowerModuleRoutes($module, $moduleContainer);
+
+        self::assertSame(
+            json_encode(['id' => '123']),
+            (string) $router->handle($this->getRequest('/dynamic-route/users/123'))->getBody(),
+        );
+    }
+
     private function getRequest(string $endpoint, string $type = 'GET'): ServerRequestInterface
     {
         return (new ServerRequestFactory())->createServerRequest($type, sprintf('http://localhost/%s', ltrim($endpoint, '/')));
@@ -103,7 +141,7 @@ class RouterTest extends TestCase
     private function getRouter(ConfigurableContainer $rootContainer, array $modules): ModularRouterInterface
     {
         $router = new Router(
-            new JsonStrategy(new ResponseFactory()),
+            new JsonRouterStrategy(new ResponseFactory()),
         );
 
         foreach ($modules as $moduleName) {

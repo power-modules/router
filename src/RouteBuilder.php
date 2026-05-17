@@ -10,6 +10,9 @@ use RuntimeException;
 
 final class RouteBuilder
 {
+    /**
+     * @var class-string|null
+     */
     private ?string $controllerName = null;
 
     private string $methodName = 'index';
@@ -22,10 +25,13 @@ final class RouteBuilder
     private array $pathSegments = [];
 
     /**
-     * @var array<class-string<MiddlewareInterface>>
+     * @var list<class-string<MiddlewareInterface>>
      */
     private array $middleware = [];
 
+    /**
+     * @param class-string $controllerName
+     */
     public static function for(string $controllerName, string $methodName = '__invoke'): self
     {
         $instance = new self();
@@ -47,7 +53,9 @@ final class RouteBuilder
      */
     public function withMiddleware(string ...$middlewares): self
     {
-        $this->middleware = array_merge($this->middleware, $middlewares);
+        foreach ($middlewares as $middleware) {
+            $this->middleware[] = $middleware;
+        }
 
         return $this;
     }

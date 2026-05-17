@@ -23,15 +23,18 @@ use Psr\Http\Server\MiddlewareInterface;
 class Route implements HasMiddleware, HasResponseDecorators
 {
     /**
-     * @var array<class-string<MiddlewareInterface>>
+     * @var list<class-string<MiddlewareInterface>>
      */
     private array $middleware = [];
 
     /**
-     * @var array<callable(ResponseInterface):ResponseInterface>
+     * @var list<callable(ResponseInterface):ResponseInterface>
      */
     private array $responseDecorators = [];
 
+    /**
+     * @param class-string $controllerName
+     */
     public function __construct(
         public readonly string $path,
         public readonly string $controllerName,
@@ -40,48 +43,68 @@ class Route implements HasMiddleware, HasResponseDecorators
     ) {
     }
 
+    /**
+     * @param class-string $controllerName
+     */
     public static function get(string $path, string $controllerName, string $controllerMethodName = 'handle'): self
     {
         return new self($path, $controllerName, $controllerMethodName, RouteMethod::Get);
     }
 
+    /**
+     * @param class-string $controllerName
+     */
     public static function post(string $path, string $controllerName, string $controllerMethodName = 'handle'): self
     {
         return new self($path, $controllerName, $controllerMethodName, RouteMethod::Post);
     }
 
+    /**
+     * @param class-string $controllerName
+     */
     public static function put(string $path, string $controllerName, string $controllerMethodName = 'handle'): self
     {
         return new self($path, $controllerName, $controllerMethodName, RouteMethod::Put);
     }
 
+    /**
+     * @param class-string $controllerName
+     */
     public static function delete(string $path, string $controllerName, string $controllerMethodName = 'handle'): self
     {
         return new self($path, $controllerName, $controllerMethodName, RouteMethod::Delete);
     }
 
+    /**
+     * @param class-string $controllerName
+     */
     public static function patch(string $path, string $controllerName, string $controllerMethodName = 'handle'): self
     {
         return new self($path, $controllerName, $controllerMethodName, RouteMethod::Patch);
     }
 
+    /**
+     * @param class-string $controllerName
+     */
     public static function options(string $path, string $controllerName, string $controllerMethodName = 'handle'): self
     {
         return new self($path, $controllerName, $controllerMethodName, RouteMethod::Options);
     }
 
+    /**
+     * @param class-string $controllerName
+     */
     public static function head(string $path, string $controllerName, string $controllerMethodName = 'handle'): self
     {
         return new self($path, $controllerName, $controllerMethodName, RouteMethod::Head);
     }
 
+    /**
+     * @param class-string<MiddlewareInterface> ...$middlewareClassNames
+     */
     public function addMiddleware(string ...$middlewareClassNames): self
     {
         foreach ($middlewareClassNames as $middlewareClassName) {
-            if (is_a($middlewareClassName, MiddlewareInterface::class, true) === false) {
-                continue;
-            }
-
             $this->middleware = [
                 ...$this->middleware,
                 $middlewareClassName,
@@ -91,11 +114,17 @@ class Route implements HasMiddleware, HasResponseDecorators
         return $this;
     }
 
+    /**
+     * @return list<class-string<MiddlewareInterface>>
+     */
     public function getMiddleware(): array
     {
         return $this->middleware;
     }
 
+    /**
+     * @param callable(ResponseInterface):ResponseInterface $responseDecorator
+     */
     public function addResponseDecorator(callable $responseDecorator): self
     {
         $this->responseDecorators[] = $responseDecorator;
@@ -103,6 +132,9 @@ class Route implements HasMiddleware, HasResponseDecorators
         return $this;
     }
 
+    /**
+     * @return list<callable(ResponseInterface):ResponseInterface>
+     */
     public function getResponseDecorators(): array
     {
         return $this->responseDecorators;

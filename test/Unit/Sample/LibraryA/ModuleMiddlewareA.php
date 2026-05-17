@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modular\Router\Test\Unit\Sample\LibraryA;
 
 use Psr\Http\Message\ResponseInterface;

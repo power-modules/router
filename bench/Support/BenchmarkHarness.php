@@ -6,10 +6,10 @@ namespace Modular\Router\Bench\Support;
 
 use Laminas\Diactoros\ResponseFactory;
 use Laminas\Diactoros\ServerRequestFactory;
-use League\Route\Strategy\JsonStrategy;
 use Modular\Framework\Container\ConfigurableContainer;
 use Modular\Router\Bench\Fixtures\BenchmarkDataset;
 use Modular\Router\Router;
+use Modular\Router\Strategy\JsonRouterStrategy;
 
 final class BenchmarkHarness
 {
@@ -129,7 +129,7 @@ final class BenchmarkHarness
 
     private function buildRegisteredRouter(BenchmarkDataset $dataset): Router
     {
-        $router = new Router(new JsonStrategy(new ResponseFactory()));
+        $router = new Router(new JsonRouterStrategy(new ResponseFactory()));
 
         foreach ($dataset->modules as $module) {
             $moduleContainer = new ConfigurableContainer();

@@ -12,6 +12,7 @@ use Modular\Framework\PowerModule\Contract\PowerModule;
 use Modular\Router\Config\Config;
 use Modular\Router\Config\Setting;
 use Modular\Router\Contract\ModularRouterInterface;
+use Modular\Router\Strategy\RouterStrategy;
 
 class RouterModule implements PowerModule, ExportsComponents, HasConfig
 {
@@ -31,11 +32,14 @@ class RouterModule implements PowerModule, ExportsComponents, HasConfig
 
     public function register(ConfigurableContainerInterface $container): void
     {
+        /** @var RouterStrategy $strategy */
+        $strategy = $this->powerModuleConfig->get(Setting::Strategy);
+
         $container->set(
             ModularRouterInterface::class,
             Router::class,
         )->addArguments([
-            $this->powerModuleConfig->get(Setting::Strategy),
+            $strategy,
         ]);
     }
 }
