@@ -36,8 +36,8 @@ final class BenchmarkDatasetFactory
     private const SIZE_TO_ROUTE_TARGET = [
         'small' => 100,
         'medium' => 500,
-        'large' => 2500,
-        'xlarge' => 5000,
+        'large' => 2_500,
+        'xlarge' => 5_000,
     ];
 
     /**
