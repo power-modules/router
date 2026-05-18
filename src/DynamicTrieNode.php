@@ -11,7 +11,5 @@ final class DynamicTrieNode
 
     public ?DynamicTrieNode $placeholderChild = null;
 
-    public ?string $placeholderName = null;
-
     public ?RegisteredRoute $route = null;
 }

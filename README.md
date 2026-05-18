@@ -157,7 +157,7 @@ class AdminModule implements PowerModule, HasRoutes, HasMiddleware
 ### Middleware Composition
 - **Module-Level**: Applied to all routes in the module
 - **Route-Level**: Applied to specific routes only
-- **Resolution Priority**: Module container first, then router container
+- **Resolution Context**: Handlers and middleware resolve from their originating module container
 
 ### Response Transformation
 - **Global Decorators**: Applied to all responses

@@ -12,6 +12,7 @@ use Modular\Framework\PowerModule\Contract\PowerModule;
 use Modular\Router\Contract\ModularRouterInterface;
 use Modular\Router\Router;
 use Modular\Router\Test\Unit\Sample\AmbiguousRoutes\AmbiguousRoutesModule;
+use Modular\Router\Test\Unit\Sample\DisambiguatedDynamicRoutes\DisambiguatedDynamicRoutesModule;
 use Modular\Router\Test\Unit\Sample\DispatchContract\DispatchContractModule;
 use Modular\Router\Strategy\JsonRouterStrategy;
 use Modular\Router\Test\Unit\Sample\DuplicateRoutes\DuplicateRoutesModule;
@@ -157,6 +158,22 @@ class RouterTest extends TestCase
         );
 
         $router->registerPowerModuleRoutes($module, $moduleContainer);
+        $router->handle($this->getRequest('/ambiguous-routes/reports/2026'));
+    }
+
+    public function testRouterAllowsDisambiguatedDynamicRoutesWithDifferentPlaceholderNames(): void
+    {
+        $router = $this->getRouter(new ConfigurableContainer(), [DisambiguatedDynamicRoutesModule::class]);
+
+        self::assertSame(
+            json_encode(['attributes' => ['year' => '2026']]),
+            (string) $router->handle($this->getRequest('/disambiguated-dynamic-routes/reports/2026/summary'))->getBody(),
+        );
+
+        self::assertSame(
+            json_encode(['attributes' => ['slug' => 'annual-review']]),
+            (string) $router->handle($this->getRequest('/disambiguated-dynamic-routes/reports/annual-review/details'))->getBody(),
+        );
     }
 
     public function testRouterPreservesExactTrailingSlashBehavior(): void
@@ -195,6 +212,17 @@ class RouterTest extends TestCase
         $response = $router->handle($this->getRequest('/dispatch-contract/method-check', 'HEAD'));
 
         self::assertSame(200, $response->getStatusCode());
+        self::assertSame(
+            [
+                'method' => 'GET',
+                'path' => '/dispatch-contract/method-check',
+                'attributes' => [],
+                'headers' => [
+                    'X-Middleware-Order' => ['module'],
+                ],
+            ],
+            json_decode((string) $response->getBody(), true),
+        );
     }
 
     public function testOptionsReturnsAllowedMethodsForPath(): void

@@ -57,19 +57,18 @@ This organization provides clear ownership and prevents route conflicts between 
 
 ### Container Hierarchy
 
-The router creates a layered container architecture that preserves module encapsulation:
+The native router keeps router services in the application container while preserving per-module resolution for runtime request handling:
 
 ```
 Application Container
-└── Router Container (internal)
-    ├── RouterModule Services
-    │   ├── ModularRouterInterface
-    │   ├── RouteMatcher / RouteCompiler
-    │   └── Strategy Configuration
-    └── Handler Registrations
-        ├── UserProfileHandler → UserModule Container
-        ├── AdminDashboardHandler → AdminModule Container
-        └── ApiHealthHandler → ApiModule Container
+├── RouterModule Services
+│   ├── ModularRouterInterface
+│   ├── RouteCompiler / RouteMatcher
+│   └── Router Strategy Configuration
+└── Module Containers
+    ├── UserModule Container
+    ├── AdminModule Container
+    └── ApiModule Container
 ```
 
 ### Handler Resolution Strategy
@@ -104,30 +103,31 @@ Response decorators are applied in a predictable "inside-out" order after the ha
 
 For detailed information about decorator execution order and practical usage patterns, see the [Response Decorators section in Advanced Patterns](advanced-patterns.md#response-decorators).
 
-### Lazy Middleware Resolution Strategy
+### Native Execution Pipeline
 
-The router resolves middleware and handlers lazily from module containers at execution time:
+The router now owns its runtime pipeline end to end and resolves middleware and handlers lazily from the matched module container at execution time.
 
 **Registration Phase** (during bootstrap):
-```php
-// For each middleware class, register a container reference
-$this->container->set($middlewareClassName, $moduleContainer, InstanceViaContainerResolver::class);
-$middlewareAwareInterface->lazyMiddleware($middlewareClassName);
-```
+1. Store the fully resolved route path and method.
+2. Record the originating module container.
+3. Record ordered middleware, decorators, and placeholder metadata.
 
-**Resolution Phase** (per request):
-1. League Route calls `$routerContainer->get($middlewareClassName)` when route is matched
-2. `InstanceViaContainerResolver` delegates to `$moduleContainer->get($middlewareClassName)`
-3. Middleware instantiated from correct module with proper dependencies
+**Compilation Phase**:
+1. Build per-method static route maps.
+2. Build per-method dynamic tries for placeholder routes.
+3. Record module prefixes for fast prefix partitioning.
+
+**Execution Phase** (per request):
+1. Match the request path against the compiled route table.
+2. Resolve middleware classes from the matched route's module container.
+3. Resolve the matched `RequestHandlerInterface` from the same module container.
+4. Execute the explicit middleware pipeline, then apply decorators.
 
 **Key Benefits**:
-- **Performance**: Middleware only resolved when routes are actually hit
-- **Memory Efficiency**: No pre-instantiated middleware instances during bootstrap
-- **Module Encapsulation**: Middleware resolves from originating module container
-- **Framework Integration**: Leverages League Route's `ContainerAwareInterface` strategy
-- **Consistency**: Same `InstanceViaContainerResolver` pattern used for controllers
-
-This approach demonstrates how to work **with** existing framework patterns rather than against them, achieving both performance and architectural goals.
+- **Performance**: Only the matched route's middleware and handler are resolved.
+- **Explicit Semantics**: Matching, `HEAD`, `OPTIONS`, 404, and 405 behavior are router-owned.
+- **Module Encapsulation**: Runtime resolution stays inside the originating module container.
+- **Vendor Independence**: No League Route or FastRoute dispatcher behavior leaks into runtime.
 
 ## Request Lifecycle
 

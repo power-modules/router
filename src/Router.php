@@ -77,7 +77,6 @@ class Router implements ModularRouterInterface
         }
 
         $this->compiledRouteTable = null;
-        $this->ensureCompiled();
     }
 
     public function handle(ServerRequestInterface $request): ResponseInterface
@@ -204,7 +203,7 @@ class Router implements ModularRouterInterface
             );
 
             if ($getMatch instanceof MatchedRoute) {
-                return $this->executeMatchedRoute($request, $getMatch);
+                return $this->executeMatchedRoute($request->withMethod(RouteMethod::Get->value), $getMatch);
             }
         }
 

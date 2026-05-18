@@ -46,23 +46,8 @@ final class RouteCompiler
         $node = $rootNode;
 
         foreach ($this->parseRouteSegments($registeredRoute->relativePath) as $segment) {
-            $placeholderName = $this->extractPlaceholderName($segment);
-
-            if ($placeholderName !== null) {
-                if (
-                    $node->placeholderChild !== null
-                    && $node->placeholderName !== null
-                    && $node->placeholderName !== $placeholderName
-                ) {
-                    throw new InvalidArgumentException(sprintf(
-                        'Ambiguous dynamic route registration for [%s] %s',
-                        $registeredRoute->method->value,
-                        $registeredRoute->path,
-                    ));
-                }
-
+            if ($this->extractPlaceholderName($segment) !== null) {
                 $node->placeholderChild ??= new DynamicTrieNode();
-                $node->placeholderName = $placeholderName;
                 $node = $node->placeholderChild;
 
                 continue;
@@ -74,7 +59,7 @@ final class RouteCompiler
 
         if ($node->route !== null) {
             throw new InvalidArgumentException(sprintf(
-                'Duplicate route registration for [%s] %s',
+                'Ambiguous dynamic route registration for [%s] %s',
                 $registeredRoute->method->value,
                 $registeredRoute->path,
             ));

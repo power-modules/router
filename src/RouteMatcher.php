@@ -30,7 +30,7 @@ final class RouteMatcher
     private function matchDynamic(DynamicTrieNode $rootNode, string $relativePath): ?MatchedRoute
     {
         $segments = $this->parseRequestSegments($relativePath);
-        $attributes = [];
+        $capturedSegments = [];
         $node = $rootNode;
 
         foreach ($segments as $segment) {
@@ -40,11 +40,11 @@ final class RouteMatcher
                 continue;
             }
 
-            if ($node->placeholderChild === null || $node->placeholderName === null) {
+            if ($node->placeholderChild === null) {
                 return null;
             }
 
-            $attributes[$node->placeholderName] = $segment;
+            $capturedSegments[] = $segment;
             $node = $node->placeholderChild;
         }
 
@@ -52,7 +52,26 @@ final class RouteMatcher
             return null;
         }
 
-        return new MatchedRoute($node->route, $attributes);
+        return new MatchedRoute($node->route, $this->mapAttributes($node->route, $capturedSegments));
+    }
+
+    /**
+     * @param list<string> $capturedSegments
+     * @return array<string, string>
+     */
+    private function mapAttributes(RegisteredRoute $route, array $capturedSegments): array
+    {
+        $attributes = [];
+
+        foreach ($route->placeholderNames as $index => $placeholderName) {
+            if (!isset($capturedSegments[$index])) {
+                break;
+            }
+
+            $attributes[$placeholderName] = $capturedSegments[$index];
+        }
+
+        return $attributes;
     }
 
     /**
