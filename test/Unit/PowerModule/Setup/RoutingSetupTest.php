@@ -35,7 +35,7 @@ class RoutingSetupTest extends TestCase
             $module,
             $rootContainer,
             $moduleContainer,
-            $this->createMock(Config::class),
+            $this->createStub(Config::class),
         );
 
         new RoutingSetup()->setup($dto);
@@ -49,8 +49,8 @@ class RoutingSetupTest extends TestCase
             SetupPhase::Pre,
             new LibraryAModule(),
             $rootContainer,
-            $this->createMock(ConfigurableContainerInterface::class),
-            $this->createMock(Config::class),
+            $this->createStub(ConfigurableContainerInterface::class),
+            $this->createStub(Config::class),
         );
         new RoutingSetup()->setup($dto);
     }
@@ -69,8 +69,8 @@ class RoutingSetupTest extends TestCase
             SetupPhase::Post,
             $module,
             $rootContainer,
-            $this->createMock(ConfigurableContainerInterface::class),
-            $this->createMock(Config::class),
+            $this->createStub(ConfigurableContainerInterface::class),
+            $this->createStub(Config::class),
         );
         new RoutingSetup()->setup($dto);
     }
@@ -84,8 +84,8 @@ class RoutingSetupTest extends TestCase
             SetupPhase::Post,
             new LibraryAModule(),
             $rootContainer,
-            $this->createMock(ConfigurableContainerInterface::class),
-            $this->createMock(Config::class),
+            $this->createStub(ConfigurableContainerInterface::class),
+            $this->createStub(Config::class),
         );
         new RoutingSetup()->setup($dto);
     }

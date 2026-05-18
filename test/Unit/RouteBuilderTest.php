@@ -6,9 +6,10 @@ namespace Modular\Router\Test\Unit;
 
 use Modular\Router\RouteBuilder;
 use Modular\Router\RouteMethod;
+use Modular\Router\Test\Unit\Sample\LibraryA\ModuleMiddlewareA;
+use Modular\Router\Test\Unit\Sample\LibraryA\RouteMiddlewareA;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use Psr\Http\Server\MiddlewareInterface;
 use RuntimeException;
 
 enum TestEnum: string
@@ -42,8 +43,8 @@ final class RouteBuilderTest extends TestCase
 
     public function testWithMiddleware(): void
     {
-        $middleware1 = get_class($this->createMock(MiddlewareInterface::class));
-        $middleware2 = get_class($this->createMock(MiddlewareInterface::class));
+        $middleware1 = RouteMiddlewareA::class;
+        $middleware2 = ModuleMiddlewareA::class;
 
         $builder = RouteBuilder::for(self::class)
             ->withMiddleware($middleware1, $middleware2);
