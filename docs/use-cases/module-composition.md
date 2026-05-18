@@ -76,11 +76,11 @@ final readonly class UserModule implements PowerModule, ImportsComponents, Expor
     public function getRoutes(): array
     {
         return [
-            Route::get('/', UserController::class, 'index'),
-            Route::post('/', UserController::class, 'create'),
-            Route::get('/{id}', UserController::class, 'show'),
-            Route::put('/{id}', UserController::class, 'update'),
-            Route::delete('/{id}', UserController::class, 'delete'),
+            Route::get('/', ListUsersHandler::class),
+            Route::post('/', CreateUserHandler::class),
+            Route::get('/{id}', ShowUserHandler::class),
+            Route::put('/{id}', UpdateUserHandler::class),
+            Route::delete('/{id}', DeleteUserHandler::class),
         ];
     }
 }
@@ -108,10 +108,10 @@ final readonly class OrderModule implements PowerModule, ImportsComponents, Expo
     public function getRoutes(): array
     {
         return [
-            Route::get('/', OrderController::class, 'index'),
-            Route::post('/', OrderController::class, 'create'),
-            Route::get('/{id}', OrderController::class, 'show'),
-            Route::post('/{id}/payment', PaymentController::class, 'process'),
+            Route::get('/', ListOrdersHandler::class),
+            Route::post('/', CreateOrderHandler::class),
+            Route::get('/{id}', ShowOrderHandler::class),
+            Route::post('/{id}/payment', ProcessPaymentHandler::class),
         ];
     }
 }
@@ -219,8 +219,8 @@ final readonly class AnalyticsModule implements PowerModule, ImportsComponents, 
     public function getRoutes(): array
     {
         return [
-            Route::get('/dashboard', AnalyticsController::class, 'dashboard'),
-            Route::get('/reports/{type}', AnalyticsController::class, 'report'),
+            Route::get('/dashboard', AnalyticsDashboardHandler::class),
+            Route::get('/reports/{type}', AnalyticsReportHandler::class),
         ];
     }
 }
@@ -254,10 +254,10 @@ final readonly class AdminModule implements PowerModule, ImportsComponents, HasR
     public function getRoutes(): array
     {
         return [
-            Route::get('/dashboard', AdminController::class, 'dashboard'),
-            Route::get('/users', AdminUserController::class, 'index'),
-            Route::get('/orders', AdminOrderController::class, 'index'),
-            Route::get('/analytics', AdminAnalyticsController::class, 'dashboard'),
+            Route::get('/dashboard', AdminDashboardHandler::class),
+            Route::get('/users', ListAdminUsersHandler::class),
+            Route::get('/orders', ListAdminOrdersHandler::class),
+            Route::get('/analytics', AdminAnalyticsDashboardHandler::class),
         ];
     }
 }
@@ -277,10 +277,10 @@ final readonly class DevToolsModule implements PowerModule, HasRoutes, HasCustom
     public function getRoutes(): array
     {
         return [
-            Route::get('/debug', DebugController::class, 'info'),
-            Route::get('/profiler', ProfilerController::class, 'show'),
-            Route::post('/test-data', TestDataController::class, 'create'),
-            Route::delete('/test-data', TestDataController::class, 'clear'),
+            Route::get('/debug', DebugInfoHandler::class),
+            Route::get('/profiler', ShowProfilerHandler::class),
+            Route::post('/test-data', CreateTestDataHandler::class),
+            Route::delete('/test-data', ClearTestDataHandler::class),
         ];
     }
 }
@@ -303,9 +303,9 @@ final readonly class MonitoringModule implements PowerModule, HasRoutes, HasCust
     public function getRoutes(): array
     {
         return [
-            Route::get('/health', HealthCheckController::class, 'detailed'),
-            Route::get('/metrics', MetricsController::class, 'prometheus'),
-            Route::get('/logs', LogController::class, 'tail'),
+            Route::get('/health', DetailedHealthCheckHandler::class),
+            Route::get('/metrics', PrometheusMetricsHandler::class),
+            Route::get('/logs', TailLogsHandler::class),
         ];
     }
 }

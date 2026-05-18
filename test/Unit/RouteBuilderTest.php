@@ -27,17 +27,8 @@ final class RouteBuilderTest extends TestCase
 
         self::assertSame('/', $route->path);
         self::assertSame(self::class, $route->controllerName);
-        self::assertSame('__invoke', $route->controllerMethodName);
         self::assertSame(RouteMethod::Get, $route->method);
         self::assertEmpty($route->getMiddleware());
-    }
-
-    public function testForWithMethodName(): void
-    {
-        $builder = RouteBuilder::for(self::class, 'customMethod');
-        $route = $builder->build();
-
-        self::assertSame('customMethod', $route->controllerMethodName);
     }
 
     public function testWithMethod(): void

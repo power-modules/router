@@ -300,14 +300,14 @@ final readonly class ApiModule implements PowerModule, ImportsComponents, HasRou
     {
         return [
             // Public login route (no middleware) - uses AuthController
-            Route::post('/auth/login', AuthController::class, 'login'),
+            Route::post('/auth/login', LoginHandler::class),
             
             // Protected routes (with AuthMiddleware)
-            Route::get('/user/profile', UserController::class, 'profile')
+            Route::get('/user/profile', UserProfileHandler::class)
                 ->addMiddleware(AuthMiddleware::class),
-            Route::get('/products', ProductController::class, 'list')
+            Route::get('/products', ListProductsHandler::class)
                 ->addMiddleware(AuthMiddleware::class),
-            Route::post('/products', ProductController::class, 'create')
+            Route::post('/products', CreateProductHandler::class)
                 ->addMiddleware(AuthMiddleware::class),
         ];
     }
@@ -370,13 +370,13 @@ $response = $router->handle($request);
 declare(strict_types=1);
 
 use Laminas\Diactoros\ResponseFactory;
-use League\Route\Strategy\JsonStrategy;
 use Modular\Router\Config\Config;
 use Modular\Router\Config\Setting;
+use Modular\Router\Strategy\JsonRouterStrategy;
 
 // Use JSON strategy for automatic JSON responses
 return Config::create()
-    ->set(Setting::Strategy, new JsonStrategy(new ResponseFactory()));
+    ->set(Setting::Strategy, new JsonRouterStrategy(new ResponseFactory()));
 ```
 
 ## Key Features

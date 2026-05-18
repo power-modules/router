@@ -19,25 +19,38 @@ final readonly class RegisteredRoute
     /** @var list<string> */
     public array $placeholderNames;
 
+    /** @var list<class-string<MiddlewareInterface>> */
+    public array $orderedMiddleware;
+
+    /** @var list<callable(ResponseInterface):ResponseInterface> */
+    public array $orderedResponseDecorators;
+
     /**
      * @param class-string $controllerName
      * @param list<class-string<MiddlewareInterface>> $middleware
      * @param list<callable(ResponseInterface):ResponseInterface> $responseDecorators
      * @param list<string> $placeholderNames
+     * @param list<class-string<MiddlewareInterface>> $orderedMiddleware
+     * @param list<callable(ResponseInterface):ResponseInterface> $orderedResponseDecorators
      */
     public function __construct(
         public string $modulePrefix,
         public string $path,
+        public string $relativePath,
         public RouteMethod $method,
         public string $controllerName,
-        public string $controllerMethodName,
         public ContainerInterface $moduleContainer,
         array $middleware,
         array $responseDecorators,
         array $placeholderNames,
+        array $orderedMiddleware,
+        array $orderedResponseDecorators,
+        public bool $isDynamic,
     ) {
         $this->middleware = $middleware;
         $this->responseDecorators = $responseDecorators;
         $this->placeholderNames = $placeholderNames;
+        $this->orderedMiddleware = $orderedMiddleware;
+        $this->orderedResponseDecorators = $orderedResponseDecorators;
     }
 }

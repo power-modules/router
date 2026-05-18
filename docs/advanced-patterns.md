@@ -34,12 +34,12 @@ For static, application-wide decorators, adding them via the configuration is a 
 ```php
 // config/modular_router.php
 use Laminas\Diactoros\ResponseFactory;
-use League\Route\Strategy\JsonStrategy;
 use Modular\Router\Config\Config;
 use Modular\Router\Config\Setting;
+use Modular\Router\Strategy\JsonRouterStrategy;
 use Psr\Http\Message\ResponseInterface;
 
-$strategy = new JsonStrategy(new ResponseFactory());
+$strategy = new JsonRouterStrategy(new ResponseFactory());
 
 // Add global decorators directly to the strategy
 $strategy->addResponseDecorator(fn(ResponseInterface $r): ResponseInterface => $r->withHeader('X-API-Version', '1.0'));
@@ -109,12 +109,12 @@ Override the default strategy for specialized routing behavior:
 ```php
 // config/modular_router.php
 use Laminas\Diactoros\ResponseFactory;
-use League\Route\Strategy\JsonStrategy;
 use Modular\Router\Config\Config;
 use Modular\Router\Config\Setting;
+use Modular\Router\Strategy\JsonRouterStrategy;
 
 return Config::create()
-    ->set(Setting::Strategy, new JsonStrategy(new ResponseFactory()));
+    ->set(Setting::Strategy, new JsonRouterStrategy(new ResponseFactory()));
 ```
 
 ### Custom Strategy with Pre-configured Decorators
@@ -127,11 +127,11 @@ First, define your custom strategy:
 // src/Http/Strategy/MyApiStrategy.php
 namespace MyApp\Http\Strategy;
 
-use League\Route\Strategy\JsonStrategy;
-use Psr\Http\Message\ResponseInterface;
 use Laminas\Diactoros\ResponseFactory;
+use Modular\Router\Strategy\JsonRouterStrategy;
+use Psr\Http\Message\ResponseInterface;
 
-class MyApiStrategy extends JsonStrategy
+class MyApiStrategy extends JsonRouterStrategy
 {
     public function __construct()
     {
@@ -163,17 +163,17 @@ return Config::create()
 
 This pattern keeps your configuration file minimal and centralizes your global response logic.
 
-### Custom Strategy for API Responses
+### Custom Strategy for Plain Responses
 
 ```php
-use League\Route\Strategy\ApplicationStrategy;
+use Modular\Router\Strategy\RouterStrategy;
 use Psr\Http\Message\ResponseInterface;
 
-class ApiStrategy extends ApplicationStrategy
+class ApiStrategy extends RouterStrategy
 {
-    protected function decorateResponse(ResponseInterface $response): ResponseInterface
+    public function decorateResponse(ResponseInterface $response): ResponseInterface
     {
-        return $response
+        return parent::decorateResponse($response)
             ->withHeader('Content-Type', 'application/json')
             ->withHeader('X-API-Framework', 'Power-Modules');
     }
@@ -215,17 +215,17 @@ final readonly class UserModule implements PowerModule, HasRoutes
     {
         return [
             // Public user routes
-            Route::get('/users', UserController::class, 'index'),
-            Route::get('/users/{id}', UserController::class, 'show'),
+            Route::get('/users', ListUsersHandler::class),
+            Route::get('/users/{id}', ShowUserHandler::class),
             
             // Protected user routes
-            Route::post('/users', UserController::class, 'create')
+            Route::post('/users', CreateUserHandler::class)
                 ->addMiddleware(AuthMiddleware::class),
-            Route::put('/users/{id}', UserController::class, 'update')
+            Route::put('/users/{id}', UpdateUserHandler::class)
                 ->addMiddleware(AuthMiddleware::class),
                 
             // Admin-only routes
-            Route::delete('/users/{id}', UserController::class, 'delete')
+            Route::delete('/users/{id}', DeleteUserHandler::class)
                 ->addMiddleware(AuthMiddleware::class, AdminMiddleware::class),
         ];
     }
@@ -272,15 +272,15 @@ final readonly class AuthModule implements PowerModule, HasRoutes
     {
         return [
             // Public routes - no middleware
-            Route::get('/login', AuthController::class, 'showLogin'),
-            Route::post('/login', AuthController::class, 'login'),
+            Route::get('/login', ShowLoginHandler::class),
+            Route::post('/login', LoginHandler::class),
             
             // Protected routes - auth required
-            Route::get('/profile', UserController::class, 'profile')
+            Route::get('/profile', UserProfileHandler::class)
                 ->addMiddleware(AuthMiddleware::class),
             
             // Admin routes - auth + admin permissions
-            Route::get('/admin/dashboard', AdminController::class, 'dashboard')
+            Route::get('/admin/dashboard', AdminDashboardHandler::class)
                 ->addMiddleware(AuthMiddleware::class, AdminMiddleware::class),
         ];
     }
@@ -331,11 +331,11 @@ final readonly class ProductModule implements PowerModule, HasRoutes
     {
         return [
             // Cache product listings
-            Route::get('/products', ProductController::class, 'index')
+            Route::get('/products', ListProductsHandler::class)
                 ->addMiddleware(new CacheMiddleware($this->cache, 3600)),
             
             // Don't cache mutations
-            Route::post('/products', ProductController::class, 'create'),
+            Route::post('/products', CreateProductHandler::class),
         ];
     }
 }

@@ -4,18 +4,27 @@ declare(strict_types=1);
 
 namespace Modular\Router\Strategy;
 
-use League\Route\ContainerAwareInterface;
-use League\Route\Strategy\StrategyInterface as LeagueRouteStrategyInterface;
-use Modular\Framework\Container\ConfigurableContainerInterface;
+use Laminas\Diactoros\ResponseFactory;
 use Modular\Router\Contract\RouterStrategyInterface;
+use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
+use Throwable;
 
-abstract class RouterStrategy implements RouterStrategyInterface
+class RouterStrategy implements RouterStrategyInterface
 {
     /**
      * @var list<callable(ResponseInterface):ResponseInterface>
      */
     private array $responseDecorators = [];
+
+    protected readonly ResponseFactoryInterface $responseFactory;
+
+    public function __construct(
+        ?ResponseFactoryInterface $responseFactory = null,
+    ) {
+        $this->responseFactory = $responseFactory ?? new ResponseFactory();
+    }
 
     /**
      * @param callable(ResponseInterface):ResponseInterface $decorator
@@ -27,21 +36,47 @@ abstract class RouterStrategy implements RouterStrategyInterface
         return $this;
     }
 
-    final public function createLeagueRouteStrategy(
-        ConfigurableContainerInterface $container,
-    ): LeagueRouteStrategyInterface {
-        $strategy = $this->buildLeagueRouteStrategy();
-
-        if ($strategy instanceof ContainerAwareInterface) {
-            $strategy->setContainer($container);
-        }
-
+    public function decorateResponse(ResponseInterface $response): ResponseInterface
+    {
         foreach ($this->responseDecorators as $responseDecorator) {
-            $strategy->addResponseDecorator($responseDecorator);
+            $response = $responseDecorator($response);
         }
 
-        return $strategy;
+        return $response;
     }
 
-    abstract protected function buildLeagueRouteStrategy(): LeagueRouteStrategyInterface;
+    public function createOptionsResponse(ServerRequestInterface $request, array $allowedMethods): ResponseInterface
+    {
+        $allowHeader = implode(', ', $allowedMethods);
+
+        return $this->decorateResponse(
+            $this->responseFactory
+                ->createResponse(200)
+                ->withHeader('Allow', $allowHeader)
+                ->withHeader('Access-Control-Allow-Methods', $allowHeader),
+        );
+    }
+
+    public function createMethodNotAllowedResponse(ServerRequestInterface $request, array $allowedMethods): ResponseInterface
+    {
+        $allowHeader = implode(', ', $allowedMethods);
+
+        return $this->decorateResponse(
+            $this->responseFactory
+                ->createResponse(405, 'Method Not Allowed')
+                ->withHeader('Allow', $allowHeader),
+        );
+    }
+
+    public function createNotFoundResponse(ServerRequestInterface $request): ResponseInterface
+    {
+        return $this->decorateResponse(
+            $this->responseFactory->createResponse(404, 'Not Found'),
+        );
+    }
+
+    public function createThrowableResponse(ServerRequestInterface $request, Throwable $throwable): ?ResponseInterface
+    {
+        return null;
+    }
 }

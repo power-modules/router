@@ -38,7 +38,6 @@ class Route implements HasMiddleware, HasResponseDecorators
     public function __construct(
         public readonly string $path,
         public readonly string $controllerName,
-        public readonly string $controllerMethodName,
         public readonly RouteMethod $method = RouteMethod::Get,
     ) {
     }
@@ -46,57 +45,57 @@ class Route implements HasMiddleware, HasResponseDecorators
     /**
      * @param class-string $controllerName
      */
-    public static function get(string $path, string $controllerName, string $controllerMethodName = 'handle'): self
+    public static function get(string $path, string $controllerName): self
     {
-        return new self($path, $controllerName, $controllerMethodName, RouteMethod::Get);
+        return new self($path, $controllerName, RouteMethod::Get);
     }
 
     /**
      * @param class-string $controllerName
      */
-    public static function post(string $path, string $controllerName, string $controllerMethodName = 'handle'): self
+    public static function post(string $path, string $controllerName): self
     {
-        return new self($path, $controllerName, $controllerMethodName, RouteMethod::Post);
+        return new self($path, $controllerName, RouteMethod::Post);
     }
 
     /**
      * @param class-string $controllerName
      */
-    public static function put(string $path, string $controllerName, string $controllerMethodName = 'handle'): self
+    public static function put(string $path, string $controllerName): self
     {
-        return new self($path, $controllerName, $controllerMethodName, RouteMethod::Put);
+        return new self($path, $controllerName, RouteMethod::Put);
     }
 
     /**
      * @param class-string $controllerName
      */
-    public static function delete(string $path, string $controllerName, string $controllerMethodName = 'handle'): self
+    public static function delete(string $path, string $controllerName): self
     {
-        return new self($path, $controllerName, $controllerMethodName, RouteMethod::Delete);
+        return new self($path, $controllerName, RouteMethod::Delete);
     }
 
     /**
      * @param class-string $controllerName
      */
-    public static function patch(string $path, string $controllerName, string $controllerMethodName = 'handle'): self
+    public static function patch(string $path, string $controllerName): self
     {
-        return new self($path, $controllerName, $controllerMethodName, RouteMethod::Patch);
+        return new self($path, $controllerName, RouteMethod::Patch);
     }
 
     /**
      * @param class-string $controllerName
      */
-    public static function options(string $path, string $controllerName, string $controllerMethodName = 'handle'): self
+    public static function options(string $path, string $controllerName): self
     {
-        return new self($path, $controllerName, $controllerMethodName, RouteMethod::Options);
+        return new self($path, $controllerName, RouteMethod::Options);
     }
 
     /**
      * @param class-string $controllerName
      */
-    public static function head(string $path, string $controllerName, string $controllerMethodName = 'handle'): self
+    public static function head(string $path, string $controllerName): self
     {
-        return new self($path, $controllerName, $controllerMethodName, RouteMethod::Head);
+        return new self($path, $controllerName, RouteMethod::Head);
     }
 
     /**

@@ -5,50 +5,50 @@ declare(strict_types=1);
 namespace Modular\Router;
 
 use InvalidArgumentException;
-use League\Route\Middleware\MiddlewareAwareInterface;
-use League\Route\RouteGroup;
-use League\Route\Router as LeagueRouter;
-use League\Route\Strategy\StrategyInterface;
-use Modular\Framework\Container\ConfigurableContainer;
-use Modular\Framework\Container\ConfigurableContainerInterface;
-use Modular\Framework\Container\InstanceResolver\InstanceViaContainerResolver;
 use Modular\Framework\PowerModule\Contract\PowerModule;
 use Modular\Router\Contract\HasMiddleware;
 use Modular\Router\Contract\HasResponseDecorators;
 use Modular\Router\Contract\HasRoutes;
 use Modular\Router\Contract\ModularRouterInterface;
-use Modular\Router\Strategy\RouterStrategy;
+use Modular\Router\Contract\RouterStrategyInterface;
 use Psr\Container\ContainerInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Server\MiddlewareInterface;
+use Throwable;
 
 class Router implements ModularRouterInterface
 {
-    private ConfigurableContainerInterface $container;
-    private LeagueRouter $router;
-    private RouteGroupPrefixResolver $routeGroupPrefixResolver;
-    private StrategyInterface $leagueStrategy;
     /**
      * @var array<string, RegisteredRoute>
      */
     private array $registeredRouteIndex = [];
 
+    private RouteGroupPrefixResolver $routeGroupPrefixResolver;
+
+    private RouteCompiler $routeCompiler;
+
+    private RouteMatcher $routeMatcher;
+
+    private AllowedMethodsResolver $allowedMethodsResolver;
+
+    private MiddlewarePipeline $middlewarePipeline;
+
+    private ?CompiledRouteTable $compiledRouteTable = null;
+
     public function __construct(
-        private readonly RouterStrategy $strategy,
+        private readonly RouterStrategyInterface $strategy,
     ) {
-        $this->container = new ConfigurableContainer();
-        $this->router = new LeagueRouter();
         $this->routeGroupPrefixResolver = new RouteGroupPrefixResolver();
-
-        $this->leagueStrategy = $strategy->createLeagueRouteStrategy($this->container);
-
-        $this->router->setStrategy($this->leagueStrategy);
+        $this->routeCompiler = new RouteCompiler();
+        $this->routeMatcher = new RouteMatcher();
+        $this->allowedMethodsResolver = new AllowedMethodsResolver($this->routeMatcher);
+        $this->middlewarePipeline = new MiddlewarePipeline();
     }
 
     public function addResponseDecorator(callable $decorator): ModularRouterInterface
     {
         $this->strategy->addResponseDecorator($decorator);
-        $this->router->getStrategy()?->addResponseDecorator($decorator);
 
         return $this;
     }
@@ -63,132 +63,75 @@ class Router implements ModularRouterInterface
         }
 
         $modulePrefix = $this->routeGroupPrefixResolver->getRouteGroupPrefix($powerModule);
-        $routes = $powerModule->getRoutes();
+        $moduleMiddleware = $powerModule instanceof HasMiddleware ? $powerModule->getMiddleware() : [];
+        $moduleResponseDecorators = $powerModule instanceof HasResponseDecorators ? $powerModule->getResponseDecorators() : [];
 
-        foreach ($routes as $route) {
-            $this->storeRegisteredRoute($modulePrefix, $route, $moduleContainer);
+        foreach ($powerModule->getRoutes() as $route) {
+            $this->storeRegisteredRoute(
+                $modulePrefix,
+                $route,
+                $moduleContainer,
+                $moduleMiddleware,
+                $moduleResponseDecorators,
+            );
         }
 
-        $moduleRouteGroup = $this->router->group(
-            $modulePrefix,
-            fn (RouteGroup $routeGroup) => $this->registerRoutes($routeGroup, $routes, $moduleContainer),
-        );
-
-        // Modules can implement HasMiddleware to add middleware to the entire route group
-        if ($powerModule instanceof HasMiddleware) {
-            $this->registerMiddlewares($moduleRouteGroup, $powerModule, $moduleContainer);
-        }
-
-        // Modules can implement HasResponseDecorators to add response decorators to the entire route group (e.g. /library-a/**)
-        if ($powerModule instanceof HasResponseDecorators) {
-            // Clone the strategy to avoid affecting other modules
-            $moduleRouteGroupStrategy = clone $this->leagueStrategy;
-            $moduleRouteGroup->setStrategy($moduleRouteGroupStrategy);
-
-            $this->registerResponseDecorators($moduleRouteGroupStrategy, $powerModule);
-        }
+        $this->compiledRouteTable = null;
+        $this->ensureCompiled();
     }
 
     public function handle(ServerRequestInterface $request): ResponseInterface
     {
-        return $this->router->handle($request);
-    }
+        $this->ensureCompiled();
 
-    /**
-     * @param array<Route> $routes
-     */
-    private function registerRoutes(
-        RouteGroup $moduleRouteGroup,
-        array $routes,
-        ContainerInterface $moduleContainer,
-    ): void {
-        foreach ($routes as $modularRoute) {
-            $leagueRoute = $moduleRouteGroup->map(
-                $modularRoute->method->value,
-                $modularRoute->path,
-                [
-                    $modularRoute->controllerName,
-                    $modularRoute->controllerMethodName,
-                ],
-            );
+        try {
+            return $this->dispatch($request);
+        } catch (Throwable $throwable) {
+            $response = $this->strategy->createThrowableResponse($request, $throwable);
 
-            $this->registerMiddlewares($leagueRoute, $modularRoute, $moduleContainer);
+            if ($response instanceof ResponseInterface) {
+                return $response;
+            }
 
-            /**
-             * League Route's Strategy inherits its group strategy, making a single route decorator applicable for all routes, which is not desired.
-             * Therefore, we need to clone the original route strategy (which is essentially the group strategy) for each route to isolate decorators.
-             * The group strategy is only set if the module implements HasResponseDecorators.
-             *
-             * @see \League\Route\RouteGroup line 68
-             */
-            $routeStrategy = clone ($leagueRoute->getStrategy() ?? $this->leagueStrategy);
-            $leagueRoute->setStrategy($routeStrategy);
-            $this->registerResponseDecorators($routeStrategy, $modularRoute);
-
-            /**
-             * Register controller with the InstanceViaContainerResolver, so it can be resolved via the module container.
-             *
-             * Controllers are registered using their fully qualified class name as the key (e.g., App\User\UserController).
-             * The InstanceViaContainerResolver ensures the controller is instantiated from its originating module's
-             * container, maintaining proper module encapsulation and dependency resolution.
-             *
-             * Different namespaces prevent controller class conflicts naturally. If modules intentionally share
-             * the same controller class (same fully qualified name), the last registration will be used,
-             * which is typically acceptable for shared components, just make sure it has all required dependencies.
-             *
-             * @see \Modular\Router\Route
-             * @see \Modular\Framework\Container\InstanceResolver\InstanceViaContainerResolver
-             */
-            $this->container->set(
-                $modularRoute->controllerName,
-                $moduleContainer,
-                InstanceViaContainerResolver::class,
-            );
+            throw $throwable;
         }
     }
 
     /**
-     * Registers middlewares for a route, route group or module.
+     * @param list<class-string<MiddlewareInterface>> $moduleMiddleware
+     * @param list<callable(ResponseInterface):ResponseInterface> $moduleResponseDecorators
      */
-    private function registerMiddlewares(
-        MiddlewareAwareInterface $middlewareAwareInterface,
-        HasMiddleware $hasMiddleware,
-        ContainerInterface $moduleContainer,
-    ): void {
-        foreach ($hasMiddleware->getMiddleware() as $middlewareClassName) {
-            // The \League\Route\Dispatcher is able to resolve middleware lazily, if the strategy is container aware
-            // All we need to do is register the class names in the root container with reference to the module container
-            $this->container->set($middlewareClassName, $moduleContainer, InstanceViaContainerResolver::class);
-            $middlewareAwareInterface->lazyMiddleware($middlewareClassName);
-        }
-    }
-
-    private function registerResponseDecorators(
-        StrategyInterface $strategy,
-        HasResponseDecorators $hasResponseDecorators,
-    ): void {
-        foreach ($hasResponseDecorators->getResponseDecorators() as $responseDecorator) {
-            $strategy->addResponseDecorator($responseDecorator);
-        }
-    }
-
     private function storeRegisteredRoute(
         string $modulePrefix,
         Route $route,
         ContainerInterface $moduleContainer,
+        array $moduleMiddleware,
+        array $moduleResponseDecorators,
     ): void {
         $fullPath = $this->normalizeRoutePath($modulePrefix, $route->path);
+        $relativePath = $this->normalizeRelativePath($modulePrefix, $fullPath);
         $placeholderNames = $this->extractPlaceholderNames($fullPath);
+        $orderedMiddleware = [
+            ...$moduleMiddleware,
+            ...$route->getMiddleware(),
+        ];
+        $orderedResponseDecorators = [
+            ...$moduleResponseDecorators,
+            ...$route->getResponseDecorators(),
+        ];
         $registeredRoute = new RegisteredRoute(
             modulePrefix: $modulePrefix,
             path: $fullPath,
+            relativePath: $relativePath,
             method: $route->method,
             controllerName: $route->controllerName,
-            controllerMethodName: $route->controllerMethodName,
             moduleContainer: $moduleContainer,
             middleware: $route->getMiddleware(),
             responseDecorators: $route->getResponseDecorators(),
             placeholderNames: $placeholderNames,
+            orderedMiddleware: $orderedMiddleware,
+            orderedResponseDecorators: $orderedResponseDecorators,
+            isDynamic: $placeholderNames !== [],
         );
 
         $indexKey = $this->getRegisteredRouteIndexKey($registeredRoute->method, $registeredRoute->path);
@@ -204,6 +147,112 @@ class Router implements ModularRouterInterface
         $this->registeredRouteIndex[$indexKey] = $registeredRoute;
     }
 
+    private function dispatch(ServerRequestInterface $request): ResponseInterface
+    {
+        $compiledRouteTable = $this->compiledRouteTable;
+
+        if ($compiledRouteTable === null) {
+            throw new InvalidArgumentException('Compiled route table is not available.');
+        }
+
+        $requestPath = $this->normalizeRequestPath($request);
+        $modulePrefix = $compiledRouteTable->resolveModulePrefix($requestPath);
+
+        if ($modulePrefix === null) {
+            return $this->strategy->createNotFoundResponse($request);
+        }
+
+        $relativePath = $compiledRouteTable->toRelativePath($modulePrefix, $requestPath);
+        $requestMethod = strtoupper($request->getMethod());
+
+        if ($requestMethod === RouteMethod::Options->value) {
+            $explicitOptionsMatch = $this->routeMatcher->match(
+                $compiledRouteTable,
+                $modulePrefix,
+                $relativePath,
+                RouteMethod::Options,
+            );
+
+            if ($explicitOptionsMatch instanceof MatchedRoute) {
+                return $this->executeMatchedRoute($request, $explicitOptionsMatch);
+            }
+
+            $allowedMethods = $this->allowedMethodsResolver->resolve($compiledRouteTable, $modulePrefix, $relativePath);
+
+            return $allowedMethods === []
+                ? $this->strategy->createNotFoundResponse($request)
+                : $this->strategy->createOptionsResponse($request, $allowedMethods);
+        }
+
+        if ($requestMethod === RouteMethod::Head->value) {
+            $explicitHeadMatch = $this->routeMatcher->match(
+                $compiledRouteTable,
+                $modulePrefix,
+                $relativePath,
+                RouteMethod::Head,
+            );
+
+            if ($explicitHeadMatch instanceof MatchedRoute) {
+                return $this->executeMatchedRoute($request, $explicitHeadMatch);
+            }
+
+            $getMatch = $this->routeMatcher->match(
+                $compiledRouteTable,
+                $modulePrefix,
+                $relativePath,
+                RouteMethod::Get,
+            );
+
+            if ($getMatch instanceof MatchedRoute) {
+                return $this->executeMatchedRoute($request, $getMatch);
+            }
+        }
+
+        $routeMethod = RouteMethod::tryFrom($requestMethod);
+
+        if ($routeMethod instanceof RouteMethod) {
+            $match = $this->routeMatcher->match(
+                $compiledRouteTable,
+                $modulePrefix,
+                $relativePath,
+                $routeMethod,
+            );
+
+            if ($match instanceof MatchedRoute) {
+                return $this->executeMatchedRoute($request, $match);
+            }
+        }
+
+        $allowedMethods = $this->allowedMethodsResolver->resolve($compiledRouteTable, $modulePrefix, $relativePath);
+
+        if ($allowedMethods !== []) {
+            return $this->strategy->createMethodNotAllowedResponse($request, $allowedMethods);
+        }
+
+        return $this->strategy->createNotFoundResponse($request);
+    }
+
+    private function executeMatchedRoute(ServerRequestInterface $request, MatchedRoute $matchedRoute): ResponseInterface
+    {
+        $response = $this->middlewarePipeline->handle($request, $matchedRoute);
+        $response = $this->strategy->decorateResponse($response);
+
+        foreach ($matchedRoute->route->orderedResponseDecorators as $responseDecorator) {
+            $response = $responseDecorator($response);
+        }
+
+        return $response;
+    }
+
+    private function ensureCompiled(): void
+    {
+        if ($this->compiledRouteTable instanceof CompiledRouteTable) {
+            return;
+        }
+
+        $this->compiledRouteTable = $this->routeCompiler->compile(array_values($this->registeredRouteIndex));
+    }
+
     private function normalizeRoutePath(string $modulePrefix, string $routePath): string
     {
         if ($routePath === '' || $routePath === '/') {
@@ -211,6 +260,21 @@ class Router implements ModularRouterInterface
         }
 
         return rtrim($modulePrefix, '/') . '/' . ltrim($routePath, '/');
+    }
+
+    private function normalizeRelativePath(string $modulePrefix, string $fullPath): string
+    {
+        if ($fullPath === $modulePrefix) {
+            return '/';
+        }
+
+        $relativePath = substr($fullPath, strlen($modulePrefix));
+
+        if ($relativePath === '') {
+            return '/';
+        }
+
+        return $relativePath;
     }
 
     /**
@@ -228,5 +292,16 @@ class Router implements ModularRouterInterface
     private function getRegisteredRouteIndexKey(RouteMethod $method, string $path): string
     {
         return $method->value . ' ' . $path;
+    }
+
+    private function normalizeRequestPath(ServerRequestInterface $request): string
+    {
+        $path = $request->getUri()->getPath();
+
+        if ($path === '') {
+            return '/';
+        }
+
+        return $path;
     }
 }

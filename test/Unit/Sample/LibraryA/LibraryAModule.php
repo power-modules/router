@@ -39,8 +39,8 @@ class LibraryAModule implements PowerModule, HasRoutes, HasMiddleware, HasRespon
                 ->addResponseDecorator(
                     static fn (ResponseInterface $response): ResponseInterface => $response->withHeader('X-Library-A-Route', 'true'),
                 ),
-            Route::get('/feature-b', LibraryAController::class, 'featureB')->addMiddleware(RouteMiddlewareA::class),
-            Route::get('/feature-c', LibraryAController::class, 'featureC'),
+            Route::get('/feature-b', LibraryAFeatureBHandler::class)->addMiddleware(RouteMiddlewareA::class),
+            Route::get('/feature-c', LibraryAFeatureCHandler::class),
         ];
     }
 
@@ -49,6 +49,16 @@ class LibraryAModule implements PowerModule, HasRoutes, HasMiddleware, HasRespon
         $container->set(
             LibraryAController::class,
             LibraryAController::class,
+        );
+
+        $container->set(
+            LibraryAFeatureBHandler::class,
+            LibraryAFeatureBHandler::class,
+        );
+
+        $container->set(
+            LibraryAFeatureCHandler::class,
+            LibraryAFeatureCHandler::class,
         );
 
         $container->set(

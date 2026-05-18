@@ -26,8 +26,8 @@ class UserModule implements PowerModule, HasRoutes
     public function getRoutes(): array
     {
         return [
-            Route::get('/profile', UserController::class, 'show'),
-            Route::put('/profile', UserController::class, 'update'),
+            Route::get('/profile', ShowUserProfileHandler::class),
+            Route::put('/profile', UpdateUserProfileHandler::class),
         ];
     }
 }
@@ -114,11 +114,11 @@ Create HTTP routes with method-specific factories.
 
 ```php
 // Static factory methods
-Route::get(string $path, string $controllerName, string $method = 'handle'): Route
-Route::post(string $path, string $controllerName, string $method = 'handle'): Route
-Route::put(string $path, string $controllerName, string $method = 'handle'): Route
-Route::patch(string $path, string $controllerName, string $method = 'handle'): Route
-Route::delete(string $path, string $controllerName, string $method = 'handle'): Route
+Route::get(string $path, string $controllerName): Route
+Route::post(string $path, string $controllerName): Route
+Route::put(string $path, string $controllerName): Route
+Route::patch(string $path, string $controllerName): Route
+Route::delete(string $path, string $controllerName): Route
 
 // Add middleware to specific routes
 addMiddleware(string ...$middlewareClassNames): Route
@@ -127,22 +127,24 @@ addMiddleware(string ...$middlewareClassNames): Route
 **Examples**:
 ```php
 // Basic routes
-Route::get('/users', UserController::class);                    // Uses 'handle' method
-Route::get('/users/{id}', UserController::class, 'show');       // Custom method
-Route::post('/users', UserController::class, 'create');
+Route::get('/users', ListUsersHandler::class);
+Route::get('/users/{id}', ShowUserHandler::class);
+Route::post('/users', CreateUserHandler::class);
 
-// Route parameters (handled by League/Route)
-Route::get('/users/{id:\d+}', UserController::class, 'show');   // Numeric constraint
-Route::get('/posts/{slug:[a-z-]+}', PostController::class);     // Custom regex
+// Native placeholder grammar currently supports basic placeholders only
+Route::get('/users/{id}', ShowUserHandler::class);
+Route::get('/posts/{slug}', ShowPostHandler::class);
 
 // Route middleware
-Route::post('/orders', OrderController::class)
+Route::post('/orders', CreateOrderHandler::class)
     ->addMiddleware(AuthMiddleware::class, ValidationMiddleware::class);
 
 // Route-level response decorators
-Route::get('/profile', UserController::class)
+Route::get('/profile', ShowUserProfileHandler::class)
     ->addResponseDecorator(fn($r) => $r->withHeader('X-Cache-Control', 'no-cache'));
 ```
+
+Handlers must implement `Psr\Http\Server\RequestHandlerInterface`.
 
 ## Router Interface
 
@@ -153,8 +155,7 @@ interface ModularRouterInterface extends RequestHandlerInterface
 {
     public function registerPowerModuleRoutes(
         PowerModule $powerModule,
-        ContainerInterface $moduleContainer,
-        ?PowerModuleConfig $powerModuleConfig = null
+        ContainerInterface $moduleContainer
     ): void;
 
     public function addResponseDecorator(callable $decorator): self;
@@ -189,7 +190,7 @@ Configure the router via `config/modular_router.php`.
 ```php
 enum Setting
 {
-    case Strategy; // League\Route strategy for request/response handling
+    case Strategy; // RouterStrategyInterface implementation for request/response handling
 }
 ```
 
@@ -197,12 +198,12 @@ enum Setting
 ```php
 // config/modular_router.php - JSON API
 <?php
-use League\Route\Strategy\JsonStrategy;
 use Laminas\Diactoros\ResponseFactory;
 use Modular\Router\Config\Config;
 use Modular\Router\Config\Setting;
+use Modular\Router\Strategy\JsonRouterStrategy;
 
-$strategy = new JsonStrategy(new ResponseFactory());
+$strategy = new JsonRouterStrategy(new ResponseFactory());
 
 // Add global decorators directly to the strategy
 $strategy->addResponseDecorator(fn($r) => $r->withHeader('X-API-Version', '1.0'));

@@ -11,9 +11,12 @@ use Modular\Framework\Container\Exception\ServiceDefinitionNotFound;
 use Modular\Framework\PowerModule\Contract\PowerModule;
 use Modular\Router\Contract\ModularRouterInterface;
 use Modular\Router\Router;
+use Modular\Router\Test\Unit\Sample\AmbiguousRoutes\AmbiguousRoutesModule;
+use Modular\Router\Test\Unit\Sample\DispatchContract\DispatchContractModule;
 use Modular\Router\Strategy\JsonRouterStrategy;
 use Modular\Router\Test\Unit\Sample\DuplicateRoutes\DuplicateRoutesModule;
 use Modular\Router\Test\Unit\Sample\DynamicRoute\DynamicRouteModule;
+use Modular\Router\Test\Unit\Sample\InvalidHandler\InvalidHandlerModule;
 use Modular\Router\Test\Unit\Sample\LibraryA\LibraryAController;
 use Modular\Router\Test\Unit\Sample\LibraryA\LibraryAModule;
 use Modular\Router\Test\Unit\Sample\LibraryA\ModuleMiddlewareA;
@@ -128,6 +131,107 @@ class RouterTest extends TestCase
             json_encode(['id' => '123']),
             (string) $router->handle($this->getRequest('/dynamic-route/users/123'))->getBody(),
         );
+    }
+
+    public function testStaticRouteTakesPrecedenceOverDynamicRoute(): void
+    {
+        $router = $this->getRouter(new ConfigurableContainer(), [DispatchContractModule::class]);
+
+        self::assertSame(
+            json_encode(['route' => 'static', 'attributes' => []]),
+            (string) $router->handle($this->getRequest('/dispatch-contract/users/all'))->getBody(),
+        );
+    }
+
+    public function testRouterRejectsAmbiguousDynamicSiblingRoutes(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Ambiguous dynamic route registration for [GET] /ambiguous-routes/reports/{slug}');
+
+        $module = new AmbiguousRoutesModule();
+        $moduleContainer = new ConfigurableContainer();
+        $module->register($moduleContainer);
+
+        $router = new Router(
+            new JsonRouterStrategy(new ResponseFactory()),
+        );
+
+        $router->registerPowerModuleRoutes($module, $moduleContainer);
+    }
+
+    public function testRouterPreservesExactTrailingSlashBehavior(): void
+    {
+        $router = $this->getRouter(new ConfigurableContainer(), [DispatchContractModule::class]);
+
+        self::assertSame(404, $router->handle($this->getRequest('/dispatch-contract/slash/'))->getStatusCode());
+        self::assertSame(200, $router->handle($this->getRequest('/dispatch-contract/slash'))->getStatusCode());
+    }
+
+    public function testRouterExecutesModuleMiddlewareBeforeRouteMiddleware(): void
+    {
+        $router = $this->getRouter(new ConfigurableContainer(), [DispatchContractModule::class]);
+
+        $response = $router->handle($this->getRequest('/dispatch-contract/ordered'));
+
+        self::assertSame('module,route', $response->getHeaderLine('X-Middleware-Order'));
+    }
+
+    public function testRouterAppliesDecoratorsInGlobalModuleRouteOrder(): void
+    {
+        $router = $this->getRouter(new ConfigurableContainer(), [DispatchContractModule::class]);
+        $router->addResponseDecorator(
+            static fn (\Psr\Http\Message\ResponseInterface $response): \Psr\Http\Message\ResponseInterface => $response->withHeader('X-Decorator-Order', trim($response->getHeaderLine('X-Decorator-Order') . ',global', ',')),
+        );
+
+        $response = $router->handle($this->getRequest('/dispatch-contract/ordered'));
+
+        self::assertSame('global,module,route', $response->getHeaderLine('X-Decorator-Order'));
+    }
+
+    public function testHeadFallsBackToGet(): void
+    {
+        $router = $this->getRouter(new ConfigurableContainer(), [DispatchContractModule::class]);
+
+        $response = $router->handle($this->getRequest('/dispatch-contract/method-check', 'HEAD'));
+
+        self::assertSame(200, $response->getStatusCode());
+    }
+
+    public function testOptionsReturnsAllowedMethodsForPath(): void
+    {
+        $router = $this->getRouter(new ConfigurableContainer(), [DispatchContractModule::class]);
+
+        $response = $router->handle($this->getRequest('/dispatch-contract/method-check', 'OPTIONS'));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame('GET, HEAD, OPTIONS, POST', $response->getHeaderLine('Allow'));
+    }
+
+    public function testRouterReturnsNotFoundForUnknownPath(): void
+    {
+        $router = $this->getRouter(new ConfigurableContainer(), [DispatchContractModule::class]);
+
+        self::assertSame(404, $router->handle($this->getRequest('/dispatch-contract/missing'))->getStatusCode());
+    }
+
+    public function testRouterReturnsMethodNotAllowedForKnownPathWithDifferentMethod(): void
+    {
+        $router = $this->getRouter(new ConfigurableContainer(), [DispatchContractModule::class]);
+
+        $response = $router->handle($this->getRequest('/dispatch-contract/method-check', 'PATCH'));
+
+        self::assertSame(405, $response->getStatusCode());
+        self::assertSame('GET, HEAD, OPTIONS, POST', $response->getHeaderLine('Allow'));
+    }
+
+    public function testRouterFailsClearlyForResolvedServiceThatIsNotARequestHandler(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Resolved route handler must implement Psr\Http\Server\RequestHandlerInterface');
+
+        $router = $this->getRouter(new ConfigurableContainer(), [InvalidHandlerModule::class]);
+
+        $router->handle($this->getRequest('/invalid-handler/invalid'));
     }
 
     private function getRequest(string $endpoint, string $type = 'GET'): ServerRequestInterface

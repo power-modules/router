@@ -56,8 +56,8 @@ class ApiModule implements PowerModule, ImportsComponents, HasRoutes, HasCustomR
     
     public function getRoutes(): array {
         return [
-            Route::get('/users', UserController::class, 'index'),
-            Route::post('/users', UserController::class, 'create'),
+            Route::get('/users', ListUsersHandler::class),
+            Route::post('/users', CreateUserHandler::class),
         ];
     }
 }
@@ -75,7 +75,7 @@ class CoreModule implements PowerModule, ExportsComponents, HasRoutes
     public function getRoutes(): array {
         return [
             Route::get('/health', HealthController::class),
-            Route::get('/plugins', PluginController::class, 'list'),
+            Route::get('/plugins', ListPluginsHandler::class),
         ];
     }
 }
@@ -89,8 +89,8 @@ class BlogPluginModule implements PowerModule, ImportsComponents, HasRoutes
     
     public function getRoutes(): array {
         return [
-            Route::get('/posts', PostController::class, 'index'),
-            Route::post('/posts', PostController::class, 'create'),
+            Route::get('/posts', ListPostsHandler::class),
+            Route::post('/posts', CreatePostHandler::class),
         ];
     }
 }
@@ -103,8 +103,8 @@ class ShopPluginModule implements PowerModule, ImportsComponents, HasRoutes
     
     public function getRoutes(): array {
         return [
-            Route::get('/products', ProductController::class, 'index'),
-            Route::post('/orders', OrderController::class, 'create'),
+            Route::get('/products', ListProductsHandler::class),
+            Route::post('/orders', CreateOrderHandler::class),
         ];
     }
 }
@@ -121,8 +121,8 @@ class UserModule implements PowerModule, ExportsComponents, HasRoutes
     
     public function getRoutes(): array {
         return [
-            Route::get('/users/{id}', UserController::class, 'show'),
-            Route::put('/users/{id}', UserController::class, 'update'),
+            Route::get('/users/{id}', ShowUserHandler::class),
+            Route::put('/users/{id}', UpdateUserHandler::class),
         ];
     }
 }
@@ -136,8 +136,8 @@ class OrderModule implements PowerModule, ImportsComponents, HasRoutes
     
     public function getRoutes(): array {
         return [
-            Route::get('/orders', OrderController::class, 'index'),
-            Route::post('/orders', OrderController::class, 'create'),
+            Route::get('/orders', ListOrdersHandler::class),
+            Route::post('/orders', CreateOrderHandler::class),
         ];
     }
 }
@@ -152,9 +152,9 @@ class DevModule implements PowerModule, HasRoutes
 {
     public function getRoutes(): array {
         return [
-            Route::get('/debug/routes', DebugController::class, 'routes'),
-            Route::get('/debug/container', DebugController::class, 'container'),
-            Route::post('/debug/reset', DebugController::class, 'reset'),
+            Route::get('/debug/routes', ShowRoutesDebugHandler::class),
+            Route::get('/debug/container', ShowContainerDebugHandler::class),
+            Route::post('/debug/reset', ResetDebugStateHandler::class),
         ];
     }
 }

@@ -64,24 +64,24 @@ Application Container
 └── Router Container (internal)
     ├── RouterModule Services
     │   ├── ModularRouterInterface
-    │   ├── League\Route\Router
+    │   ├── RouteMatcher / RouteCompiler
     │   └── Strategy Configuration
-    └── Controller Registrations
-        ├── UserController → UserModule Container
-        ├── AdminController → AdminModule Container
-        └── ApiController → ApiModule Container
+    └── Handler Registrations
+        ├── UserProfileHandler → UserModule Container
+        ├── AdminDashboardHandler → AdminModule Container
+        └── ApiHealthHandler → ApiModule Container
 ```
 
-### Controller Resolution Strategy
+### Handler Resolution Strategy
 
-Controllers are resolved using the **InstanceViaContainerResolver** pattern:
+Handlers are resolved from the originating module container during dispatch:
 
-1. **Registration Phase**: Controllers are registered in the router's container with references to their originating module containers
-2. **Resolution Phase**: When a request arrives, the controller is instantiated from its original module's container
+1. **Registration Phase**: Routes store the handler class plus its originating module container
+2. **Resolution Phase**: When a request arrives, the handler is instantiated from its original module container
 3. **Dependency Injection**: The module container provides all required dependencies
 
 This ensures that:
-- Controllers access their module's private services
+- Handlers access their module's private services
 - Module boundaries are respected at runtime
 - Dependencies are resolved from the correct context
 
@@ -90,7 +90,7 @@ This ensures that:
 Middleware resolution follows a clear precedence hierarchy:
 
 ```
-Request → Module Middleware → Route Middleware → Controller
+Request → Module Middleware → Route Middleware → RequestHandlerInterface
 ```
 
 This design allows for:
@@ -100,13 +100,13 @@ This design allows for:
 
 ### Response Decorator Chain
 
-Response decorators are applied in a predictable "inside-out" order after the controller generates a response, allowing for composable response transformations at multiple levels (global, module, and route).
+Response decorators are applied in a predictable "inside-out" order after the handler generates a response, allowing for composable response transformations at multiple levels (global, module, and route).
 
 For detailed information about decorator execution order and practical usage patterns, see the [Response Decorators section in Advanced Patterns](advanced-patterns.md#response-decorators).
 
 ### Lazy Middleware Resolution Strategy
 
-The router employs an innovative lazy resolution approach that combines League Route's built-in lazy loading with the Power Modules container system:
+The router resolves middleware and handlers lazily from module containers at execution time:
 
 **Registration Phase** (during bootstrap):
 ```php

@@ -15,8 +15,6 @@ final class RouteBuilder
      */
     private ?string $controllerName = null;
 
-    private string $methodName = 'index';
-
     private RouteMethod $routeMethod = RouteMethod::Get;
 
     /**
@@ -32,11 +30,10 @@ final class RouteBuilder
     /**
      * @param class-string $controllerName
      */
-    public static function for(string $controllerName, string $methodName = '__invoke'): self
+    public static function for(string $controllerName): self
     {
         $instance = new self();
         $instance->controllerName = $controllerName;
-        $instance->methodName = $methodName;
 
         return $instance;
     }
@@ -90,13 +87,13 @@ final class RouteBuilder
         $path = $this->buildPath();
 
         $route = match ($this->routeMethod) {
-            RouteMethod::Get => Route::get($path, $this->controllerName, $this->methodName),
-            RouteMethod::Post => Route::post($path, $this->controllerName, $this->methodName),
-            RouteMethod::Put => Route::put($path, $this->controllerName, $this->methodName),
-            RouteMethod::Delete => Route::delete($path, $this->controllerName, $this->methodName),
-            RouteMethod::Patch => Route::patch($path, $this->controllerName, $this->methodName),
-            RouteMethod::Options => Route::options($path, $this->controllerName, $this->methodName),
-            RouteMethod::Head => Route::head($path, $this->controllerName, $this->methodName),
+            RouteMethod::Get => Route::get($path, $this->controllerName),
+            RouteMethod::Post => Route::post($path, $this->controllerName),
+            RouteMethod::Put => Route::put($path, $this->controllerName),
+            RouteMethod::Delete => Route::delete($path, $this->controllerName),
+            RouteMethod::Patch => Route::patch($path, $this->controllerName),
+            RouteMethod::Options => Route::options($path, $this->controllerName),
+            RouteMethod::Head => Route::head($path, $this->controllerName),
         };
 
         foreach ($this->middleware as $middlewareClass) {

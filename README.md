@@ -72,9 +72,9 @@ class UserModule implements PowerModule, HasRoutes
     public function getRoutes(): array
     {
         return [
-            Route::get('/profile', UserController::class, 'show'),
-            Route::put('/profile', UserController::class, 'update'),
-            Route::post('/avatar', UserController::class, 'uploadAvatar')
+            Route::get('/profile', ShowUserProfileHandler::class),
+            Route::put('/profile', UpdateUserProfileHandler::class),
+            Route::post('/avatar', UploadUserAvatarHandler::class)
                 ->addMiddleware(AuthMiddleware::class),
         ];
     }
@@ -104,9 +104,9 @@ class ApiV1Module implements PowerModule, HasRoutes, HasCustomRouteSlug
     public function getRoutes(): array
     {
         return [
-            Route::get('/users', ApiUserController::class, 'index'),
-            Route::post('/users', ApiUserController::class, 'create'),
-            Route::get('/health', HealthController::class),
+            Route::get('/users', ListApiUsersHandler::class),
+            Route::post('/users', CreateApiUserHandler::class),
+            Route::get('/health', HealthCheckHandler::class),
         ];
     }
 }
@@ -133,8 +133,8 @@ class AdminModule implements PowerModule, HasRoutes, HasMiddleware
     public function getRoutes(): array
     {
         return [
-            Route::get('/dashboard', AdminController::class, 'dashboard'),
-            Route::delete('/users/{id}', AdminController::class, 'deleteUser')
+            Route::get('/dashboard', AdminDashboardHandler::class),
+            Route::delete('/users/{id}', DeleteAdminUserHandler::class)
                 ->addMiddleware(ConfirmationMiddleware::class), // Extra confirmation
         ];
     }
@@ -169,16 +169,16 @@ class AdminModule implements PowerModule, HasRoutes, HasMiddleware
 ### Route Definition
 ```php
 // HTTP method factories with intuitive API
-Route::get('/users', UserController::class, 'index');
-Route::post('/users', UserController::class, 'create');
-Route::put('/users/{id}', UserController::class, 'update');
-Route::delete('/users/{id}', UserController::class, 'delete');
+Route::get('/users', ListUsersHandler::class);
+Route::post('/users', CreateUserHandler::class);
+Route::put('/users/{id}', UpdateUserHandler::class);
+Route::delete('/users/{id}', DeleteUserHandler::class);
 
-// Method defaults to 'handle' if not specified
-Route::get('/health', HealthController::class);
+// Each route points to a RequestHandlerInterface implementation
+Route::get('/health', HealthCheckHandler::class);
 
 // Fluent middleware chaining
-Route::post('/orders', OrderController::class)
+Route::post('/orders', CreateOrderHandler::class)
     ->addMiddleware(AuthMiddleware::class, ValidationMiddleware::class);
 ```
 
@@ -209,13 +209,13 @@ Route::get('/profile', UserController::class)
 // config/modular_router.php
 <?php
 
-use League\Route\Strategy\JsonStrategy;
 use Laminas\Diactoros\ResponseFactory;
 use Modular\Router\Config\Config;
 use Modular\Router\Config\Setting;
+use Modular\Router\Strategy\JsonRouterStrategy;
 
 return Config::create()
-    ->set(Setting::Strategy, new JsonStrategy(new ResponseFactory()));
+    ->set(Setting::Strategy, new JsonRouterStrategy(new ResponseFactory()));
 ```
 
 ## 🛠️ Development
@@ -238,7 +238,7 @@ make devcontainer # Build Docker development container
 
 ### Framework Dependencies
 - **Power Modules Framework**: Core module system and DI container
-- **League/Route**: Underlying routing engine (wrapped, not extended)
+- **Laminas Diactoros**: Default PSR-7 response implementation for native strategies
 - **PSR-7/PSR-15**: HTTP message and middleware interfaces
 
 ### Extension Points
