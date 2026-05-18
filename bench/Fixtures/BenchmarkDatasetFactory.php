@@ -50,7 +50,7 @@ final class BenchmarkDatasetFactory
             'modular-static',
             'shared-prefix-dynamic',
             'low-shared-prefix-dynamic',
-            'constrained-placeholders',
+            'placeholder-variants',
             'mixed-modules',
             'precedence',
         ];
@@ -77,7 +77,7 @@ final class BenchmarkDatasetFactory
             'modular-static' => self::buildModularStatic($size, $routeTarget),
             'shared-prefix-dynamic' => self::buildSharedPrefixDynamic($size, $routeTarget),
             'low-shared-prefix-dynamic' => self::buildLowSharedPrefixDynamic($size, $routeTarget),
-            'constrained-placeholders' => self::buildConstrainedPlaceholders($size, $routeTarget),
+            'placeholder-variants' => self::buildPlaceholderVariants($size, $routeTarget),
             'mixed-modules' => self::buildMixedModules($size, $routeTarget),
             'precedence' => self::buildPrecedence($size, $routeTarget),
             default => throw new InvalidArgumentException(sprintf('Unsupported dataset "%s"', $datasetName)),
@@ -376,7 +376,7 @@ final class BenchmarkDatasetFactory
         );
     }
 
-    private static function buildConstrainedPlaceholders(string $size, int $routeTarget): BenchmarkDataset
+    private static function buildPlaceholderVariants(string $size, int $routeTarget): BenchmarkDataset
     {
         $routes = [];
         $hitRequests = [];
@@ -389,21 +389,21 @@ final class BenchmarkDatasetFactory
             $routeVariant = ($index - 1) % 4;
 
             if ($routeVariant === 0) {
-                $path = '/users/{id:number}/view-' . $suffix;
+                $path = '/users/{id}/view-' . $suffix;
                 $uri = '/api/v1/users/' . $index . '/view-' . $suffix;
-                $invalidUri = '/api/v1/users/not-a-number/view-' . $suffix;
+                $invalidUri = '/api/v1/users/' . $index . '/edit-' . $suffix;
             } elseif ($routeVariant === 1) {
-                $path = '/posts/{slug:slug}/detail-' . $suffix;
+                $path = '/posts/{slug}/detail-' . $suffix;
                 $uri = '/api/v1/posts/post-' . $suffix . '/detail-' . $suffix;
-                $invalidUri = '/api/v1/posts/Post_' . $suffix . '/detail-' . $suffix;
+                $invalidUri = '/api/v1/posts/post-' . $suffix . '/summary-' . $suffix;
             } elseif ($routeVariant === 2) {
-                $path = '/orders/{uuid:uuid}/trace-' . $suffix;
-                $uri = '/api/v1/orders/' . self::buildUuidFromIndex($index) . '/trace-' . $suffix;
-                $invalidUri = '/api/v1/orders/not-a-uuid/trace-' . $suffix;
+                $path = '/orders/{orderId}/trace-' . $suffix;
+                $uri = '/api/v1/orders/order-' . $suffix . '/trace-' . $suffix;
+                $invalidUri = '/api/v1/orders/order-' . $suffix . '/status-' . $suffix;
             } else {
-                $path = '/assets/{name:alphanum_dash}/download-' . $suffix;
+                $path = '/assets/{assetName}/download-' . $suffix;
                 $uri = '/api/v1/assets/asset-' . $suffix . '/download-' . $suffix;
-                $invalidUri = '/api/v1/assets/asset.' . $suffix . '/download-' . $suffix;
+                $invalidUri = '/api/v1/assets/asset-' . $suffix . '/preview-' . $suffix;
             }
 
             $routes[] = Route::get($path, BenchmarkController::class);
@@ -414,7 +414,7 @@ final class BenchmarkDatasetFactory
         }
 
         return new BenchmarkDataset(
-            name: 'constrained-placeholders',
+            name: 'placeholder-variants',
             size: $size,
             routeCount: count($routes),
             modules: [new SyntheticModule('/api/v1', $routes)],

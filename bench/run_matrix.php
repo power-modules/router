@@ -9,21 +9,47 @@ require __DIR__ . '/bootstrap.php';
 
 $options = getopt('', [
     'output::',
+    'profile::',
+    'label::',
     'pretty',
 ]);
 
-$sizeParameters = [
-    'small' => ['iterations' => 3, 'warmup' => 1, 'revs' => 3],
-    'medium' => ['iterations' => 2, 'warmup' => 1, 'revs' => 2],
-    'large' => ['iterations' => 1, 'warmup' => 0, 'revs' => 1],
-    'xlarge' => ['iterations' => 1, 'warmup' => 0, 'revs' => 1],
+$profiles = [
+    'stable' => [
+        'small' => ['iterations' => 5, 'warmup' => 2, 'revs' => 5],
+        'medium' => ['iterations' => 5, 'warmup' => 2, 'revs' => 3],
+        'large' => ['iterations' => 3, 'warmup' => 1, 'revs' => 2],
+        'xlarge' => ['iterations' => 3, 'warmup' => 1, 'revs' => 1],
+    ],
+    'quick' => [
+        'small' => ['iterations' => 2, 'warmup' => 1, 'revs' => 2],
+        'medium' => ['iterations' => 1, 'warmup' => 0, 'revs' => 1],
+        'large' => ['iterations' => 1, 'warmup' => 0, 'revs' => 1],
+        'xlarge' => ['iterations' => 1, 'warmup' => 0, 'revs' => 1],
+    ],
 ];
 
+$profileName = (string) ($options['profile'] ?? 'stable');
+$sizeParameters = $profiles[$profileName] ?? null;
+
+if ($sizeParameters === null) {
+    throw new RuntimeException(sprintf('Unsupported benchmark profile "%s"', $profileName));
+}
+
 $harness = new BenchmarkHarness();
-$payload = [];
+$payload = [
+    'meta' => [
+        'generated_at_utc' => gmdate('c'),
+        'profile' => $profileName,
+        'label' => isset($options['label']) ? (string) $options['label'] : null,
+        'size_parameters' => $sizeParameters,
+        'environment' => BenchmarkHarness::environmentMetadata(),
+    ],
+    'results' => [],
+];
 
 foreach (BenchmarkDatasetFactory::supportedSizes() as $size) {
-    $payload[$size] = [];
+    $payload['results'][$size] = [];
     $parameters = $sizeParameters[$size] ?? null;
 
     if ($parameters === null) {
@@ -39,16 +65,30 @@ foreach (BenchmarkDatasetFactory::supportedSizes() as $size) {
             $parameters['revs'],
         );
 
-        $payload[$size][] = [
+        $payload['results'][$size][] = [
             'dataset' => $datasetName,
             'route_count' => $result['meta']['route_count'],
+            'module_count' => $result['meta']['module_count'],
+            'request_counts' => $result['meta']['request_counts'],
+            'benchmark_parameters' => [
+                'iterations' => $result['meta']['iterations'],
+                'warmup' => $result['meta']['warmup'],
+                'revs' => $result['meta']['revs'],
+            ],
             'registration.duration_ns.median_per_operation' => $result['results']['registration']['duration_ns']['median_per_operation'],
+            'registration.memory_bytes.median_per_operation' => $result['results']['registration']['memory_bytes']['median_per_operation'],
             'bootstrap-first-hit.duration_ns.median' => $result['results']['bootstrap-first-hit']['duration_ns']['median'],
+            'bootstrap-first-hit.memory_bytes.median' => $result['results']['bootstrap-first-hit']['memory_bytes']['median'],
             'dispatch-hit.duration_ns.median_per_operation' => $result['results']['dispatch-hit']['duration_ns']['median_per_operation'],
+            'dispatch-hit.memory_bytes.median_per_operation' => $result['results']['dispatch-hit']['memory_bytes']['median_per_operation'],
             'dispatch-not-found.duration_ns.median_per_operation' => $result['results']['dispatch-not-found']['duration_ns']['median_per_operation'],
+            'dispatch-not-found.memory_bytes.median_per_operation' => $result['results']['dispatch-not-found']['memory_bytes']['median_per_operation'],
             'dispatch-method-not-allowed.duration_ns.median_per_operation' => $result['results']['dispatch-method-not-allowed']['duration_ns']['median_per_operation'],
+            'dispatch-method-not-allowed.memory_bytes.median_per_operation' => $result['results']['dispatch-method-not-allowed']['memory_bytes']['median_per_operation'],
             'dispatch-head-fallback.duration_ns.median_per_operation' => $result['results']['dispatch-head-fallback']['duration_ns']['median_per_operation'],
+            'dispatch-head-fallback.memory_bytes.median_per_operation' => $result['results']['dispatch-head-fallback']['memory_bytes']['median_per_operation'],
             'dispatch-mixed.duration_ns.median_per_operation' => $result['results']['dispatch-mixed']['duration_ns']['median_per_operation'],
+            'dispatch-mixed.memory_bytes.median_per_operation' => $result['results']['dispatch-mixed']['memory_bytes']['median_per_operation'],
         ];
     }
 }

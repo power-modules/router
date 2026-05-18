@@ -13,6 +13,27 @@ use Modular\Router\Strategy\JsonRouterStrategy;
 
 final class BenchmarkHarness
 {
+    /**
+     * @return array<string, bool|int|string|null>
+     */
+    public static function environmentMetadata(): array
+    {
+        return [
+            'php_version' => PHP_VERSION,
+            'php_sapi' => PHP_SAPI,
+            'os_family' => PHP_OS_FAMILY,
+            'kernel' => sprintf('%s %s', php_uname('s'), php_uname('r')),
+            'architecture' => php_uname('m'),
+            'opcache_extension_loaded' => extension_loaded('Zend OPcache'),
+            'opcache_enable_cli' => self::normalizeIniFlag(ini_get('opcache.enable_cli')),
+            'opcache_jit' => self::normalizeIniValue(ini_get('opcache.jit')),
+            'opcache_jit_buffer_size' => self::normalizeIniValue(ini_get('opcache.jit_buffer_size')),
+            'git_commit' => self::readCommand('git rev-parse HEAD'),
+            'git_branch' => self::readCommand('git rev-parse --abbrev-ref HEAD'),
+            'git_is_dirty' => self::readCommand('git status --porcelain') !== null,
+        ];
+    }
+
     public function run(BenchmarkDataset $dataset, int $iterations, int $warmup, int $revs): array
     {
         $results = [
@@ -26,7 +47,6 @@ final class BenchmarkHarness
 
         return [
             'meta' => [
-                'php_version' => PHP_VERSION,
                 'dataset' => $dataset->name,
                 'size' => $dataset->size,
                 'route_count' => $dataset->routeCount,
@@ -35,6 +55,7 @@ final class BenchmarkHarness
                 'iterations' => $iterations,
                 'warmup' => $warmup,
                 'revs' => $revs,
+                'environment' => self::environmentMetadata(),
             ],
             'results' => $results,
         ];
@@ -174,5 +195,42 @@ final class BenchmarkHarness
                 $router->handle($request);
             }
         }
+    }
+
+    private static function normalizeIniFlag(string|false $value): bool|int|string|null
+    {
+        if ($value === false || $value === '') {
+            return null;
+        }
+
+        $normalized = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+
+        return $normalized ?? self::normalizeIniValue($value);
+    }
+
+    private static function normalizeIniValue(string|false $value): string|int|null
+    {
+        if ($value === false || $value === '') {
+            return null;
+        }
+
+        return is_numeric($value) ? (int) $value : $value;
+    }
+
+    private static function readCommand(string $command): ?string
+    {
+        if (!function_exists('shell_exec')) {
+            return null;
+        }
+
+        $output = shell_exec($command . ' 2>/dev/null');
+
+        if (!is_string($output)) {
+            return null;
+        }
+
+        $trimmedOutput = trim($output);
+
+        return $trimmedOutput === '' ? null : $trimmedOutput;
     }
 }
