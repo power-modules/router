@@ -10,8 +10,9 @@ use Modular\Framework\Container\ConfigurableContainer;
 use Modular\Framework\Container\Exception\ServiceDefinitionNotFound;
 use Modular\Framework\PowerModule\Contract\PowerModule;
 use Modular\Router\Contract\ModularRouterInterface;
+use Modular\Router\Response\ResponseDecoratorChain;
+use Modular\Router\Response\SyntheticResponseFactory;
 use Modular\Router\Router;
-use Modular\Router\Strategy\JsonRouterStrategy;
 use Modular\Router\Test\Unit\Sample\AmbiguousRoutes\AmbiguousRoutesModule;
 use Modular\Router\Test\Unit\Sample\DisambiguatedDynamicRoutes\DisambiguatedDynamicRoutesModule;
 use Modular\Router\Test\Unit\Sample\DispatchContract\DispatchContractModule;
@@ -90,13 +91,13 @@ class RouterTest extends TestCase
         self::assertSame('true', $response->getHeaderLine('X-Library-A-Basic'));
     }
 
-    public function testRouterThrowsExceptionForUnknownMiddleware(): void
+    public function testRouterPropagatesUnknownMiddlewareResolutionExceptions(): void
     {
         $this->expectException(ServiceDefinitionNotFound::class);
-        $this->expectExceptionMessage('Service definition with id "Modular\Router\Test\Unit\Sample\LibraryA\RouteMiddlewareA" was not found.');
 
         $rootContainer = new ConfigurableContainer();
         $router = $this->getRouter($rootContainer, [LibraryCModule::class]);
+
         $router->handle($this->getRequest('/already-has-slash/no-middleware', 'GET'));
     }
 
@@ -110,7 +111,8 @@ class RouterTest extends TestCase
         $module->register($moduleContainer);
 
         $router = new Router(
-            new JsonRouterStrategy(new ResponseFactory()),
+            new SyntheticResponseFactory(new ResponseFactory()),
+            new ResponseDecoratorChain(),
         );
 
         $router->registerPowerModuleRoutes($module, $moduleContainer);
@@ -123,7 +125,8 @@ class RouterTest extends TestCase
         $module->register($moduleContainer);
 
         $router = new Router(
-            new JsonRouterStrategy(new ResponseFactory()),
+            new SyntheticResponseFactory(new ResponseFactory()),
+            new ResponseDecoratorChain(),
         );
 
         $router->registerPowerModuleRoutes($module, $moduleContainer);
@@ -144,7 +147,7 @@ class RouterTest extends TestCase
         );
     }
 
-    public function testRouterRejectsAmbiguousDynamicSiblingRoutes(): void
+    public function testRouterPropagatesLazyCompilationExceptions(): void
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Ambiguous dynamic route registration for [GET] /ambiguous-routes/reports/{slug}');
@@ -154,10 +157,12 @@ class RouterTest extends TestCase
         $module->register($moduleContainer);
 
         $router = new Router(
-            new JsonRouterStrategy(new ResponseFactory()),
+            new SyntheticResponseFactory(new ResponseFactory()),
+            new ResponseDecoratorChain(),
         );
 
         $router->registerPowerModuleRoutes($module, $moduleContainer);
+
         $router->handle($this->getRequest('/ambiguous-routes/reports/2026'));
     }
 
@@ -205,6 +210,28 @@ class RouterTest extends TestCase
         self::assertSame('global,module,route', $response->getHeaderLine('X-Decorator-Order'));
     }
 
+    public function testSyntheticResponsesApplyGlobalDecoratorsOnly(): void
+    {
+        $router = $this->getRouter(new ConfigurableContainer(), [DispatchContractModule::class]);
+        $router->addResponseDecorator(
+            static fn (\Psr\Http\Message\ResponseInterface $response): \Psr\Http\Message\ResponseInterface => $response->withHeader('X-Decorator-Order', trim($response->getHeaderLine('X-Decorator-Order') . ',global', ',')),
+        );
+
+        $response = $router->handle($this->getRequest('/dispatch-contract/missing'));
+
+        self::assertSame(404, $response->getStatusCode());
+        self::assertSame('application/problem+json', $response->getHeaderLine('Content-Type'));
+        self::assertSame(
+            [
+                'type' => 'about:blank',
+                'title' => 'Not Found',
+                'status' => 404,
+            ],
+            json_decode((string) $response->getBody(), true),
+        );
+        self::assertSame('global', $response->getHeaderLine('X-Decorator-Order'));
+    }
+
     public function testHeadFallsBackToGet(): void
     {
         $router = $this->getRouter(new ConfigurableContainer(), [DispatchContractModule::class]);
@@ -239,7 +266,18 @@ class RouterTest extends TestCase
     {
         $router = $this->getRouter(new ConfigurableContainer(), [DispatchContractModule::class]);
 
-        self::assertSame(404, $router->handle($this->getRequest('/dispatch-contract/missing'))->getStatusCode());
+        $response = $router->handle($this->getRequest('/dispatch-contract/missing'));
+
+        self::assertSame(404, $response->getStatusCode());
+        self::assertSame('application/problem+json', $response->getHeaderLine('Content-Type'));
+        self::assertSame(
+            [
+                'type' => 'about:blank',
+                'title' => 'Not Found',
+                'status' => 404,
+            ],
+            json_decode((string) $response->getBody(), true),
+        );
     }
 
     public function testRouterReturnsMethodNotAllowedForKnownPathWithDifferentMethod(): void
@@ -249,13 +287,22 @@ class RouterTest extends TestCase
         $response = $router->handle($this->getRequest('/dispatch-contract/method-check', 'PATCH'));
 
         self::assertSame(405, $response->getStatusCode());
+        self::assertSame('application/problem+json', $response->getHeaderLine('Content-Type'));
+        self::assertSame(
+            [
+                'type' => 'about:blank',
+                'title' => 'Method Not Allowed',
+                'status' => 405,
+            ],
+            json_decode((string) $response->getBody(), true),
+        );
         self::assertSame('GET, HEAD, OPTIONS, POST', $response->getHeaderLine('Allow'));
     }
 
-    public function testRouterFailsClearlyForResolvedServiceThatIsNotARequestHandler(): void
+    public function testRouterPropagatesInvalidResolvedHandlerExceptions(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Resolved route handler must implement Psr\Http\Server\RequestHandlerInterface');
+        $this->expectExceptionMessage('Resolved route handler must implement Psr\\Http\\Server\\RequestHandlerInterface, Modular\\Router\\Test\\Unit\\Sample\\InvalidHandler\\InvalidHandlerController returned.');
 
         $router = $this->getRouter(new ConfigurableContainer(), [InvalidHandlerModule::class]);
 
@@ -272,8 +319,10 @@ class RouterTest extends TestCase
      */
     private function getRouter(ConfigurableContainer $rootContainer, array $modules): ModularRouterInterface
     {
+        $responseDecoratorChain = new ResponseDecoratorChain();
         $router = new Router(
-            new JsonRouterStrategy(new ResponseFactory()),
+            new SyntheticResponseFactory(new ResponseFactory()),
+            $responseDecoratorChain,
         );
 
         foreach ($modules as $moduleName) {

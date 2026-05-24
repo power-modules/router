@@ -7,23 +7,22 @@ namespace Modular\Router;
 use Modular\Framework\Container\ConfigurableContainerInterface;
 use Modular\Framework\PowerModule\Contract\ExportsComponents;
 use Modular\Framework\PowerModule\Contract\PowerModule;
-use Modular\Router\Contract\HttpEntrypointInterface;
 use Modular\Router\Contract\HttpEntrypointMiddlewareInterface;
-use Modular\Router\Contract\ModularRouterInterface;
 use Modular\Router\Contract\ResponseDecoratorChainInterface;
 use Modular\Router\Contract\SyntheticResponseFactoryInterface;
+use Modular\Router\Response\ResponseDecoratorChain;
+use Modular\Router\Response\SyntheticResponseFactory;
 use Override;
 
-class RouterModule implements
-    PowerModule,
-    ExportsComponents
+class RoutingModule implements PowerModule, ExportsComponents
 {
     #[Override]
     public static function exports(): array
     {
         return [
-            ModularRouterInterface::class,
-            HttpEntrypointInterface::class,
+            SyntheticResponseFactoryInterface::class,
+            ResponseDecoratorChainInterface::class,
+            HttpEntrypointMiddlewareInterface::class,
         ];
     }
 
@@ -31,19 +30,20 @@ class RouterModule implements
     public function register(ConfigurableContainerInterface $container): void
     {
         $container->set(
-            ModularRouterInterface::class,
-            Router::class,
-        )->addArguments([
             SyntheticResponseFactoryInterface::class,
-            ResponseDecoratorChainInterface::class,
-        ]);
+            SyntheticResponseFactory::class,
+        );
 
         $container->set(
-            HttpEntrypointInterface::class,
-            HttpEntrypoint::class,
-        )->addArguments([
+            ResponseDecoratorChainInterface::class,
+            ResponseDecoratorChain::class,
+        );
+
+        $container->set(
             HttpEntrypointMiddlewareInterface::class,
-            ModularRouterInterface::class,
+            ExceptionHandlingMiddleware::class,
+        )->addArguments([
+            ResponseDecoratorChainInterface::class,
         ]);
     }
 }

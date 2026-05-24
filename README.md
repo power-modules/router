@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![PHPStan](https://img.shields.io/badge/PHPStan-level%208-blue)](#)
 
-A **modular router component** for the Power Modules framework that provides HTTP routing capabilities with strict module encapsulation and dependency injection integration.
+A **modular router component** for the Power Modules framework that provides HTTP routing capabilities with strict module encapsulation, dependency injection integration, and RFC 7807 problem-details defaults for router-owned errors.
 
 > **🔌 Perfect Integration**: Built specifically for the Power Modules ecosystem with automatic route discovery, module-scoped controllers, and composable middleware stacks.
 
@@ -17,6 +17,7 @@ A **modular router component** for the Power Modules framework that provides HTT
 - **🎯 Auto-Prefixing**: Module names automatically become URL prefixes (`UserModule` → `/user/*`)
 - **🧩 Composable Middleware**: Module-level and route-level middleware stacking
 - **⚡ Zero Configuration**: Automatic route discovery with convention-based patterns
+- **📄 RFC 7807 By Default**: Router-owned errors and default unhandled exceptions emit `application/problem+json`
 - **🛡️ Type-Safe**: Full PHP 8.4+ type system integration with enums and strict typing
 
 ## Quick Start
@@ -29,21 +30,23 @@ composer require power-modules/router
 <?php
 
 use Modular\Framework\App\ModularAppBuilder;
+use Modular\Router\RoutingModule;
 use Modular\Router\RouterModule;
 use Modular\Router\PowerModule\Setup\RoutingSetup;
 
 $app = new ModularAppBuilder(__DIR__)
-    ->withPowerSetup(new RoutingSetup())
+    ->withPowerSetup(...RoutingSetup::withDefaults())
     ->withModules(
+        RoutingModule::class,          // Provides RFC 7807 synthetic responses, global decorators, and entrypoint exception middleware
         RouterModule::class,           // Provides routing infrastructure
         \MyApp\User\UserModule::class, // Your modules with routes
         \MyApp\Admin\AdminModule::class,
     )
     ->build();
 
-// Get router and handle PSR-7 requests
-$router = $app->get(\Modular\Router\Contract\ModularRouterInterface::class);
-$response = $router->handle($serverRequest);
+// Get the composed HTTP entrypoint and handle PSR-7 requests
+$httpEntrypoint = $app->get(\Modular\Router\Contract\HttpEntrypointInterface::class);
+$response = $httpEntrypoint->handle($serverRequest);
 ```
 
 ## 📚 Documentation
@@ -54,7 +57,7 @@ $response = $router->handle($serverRequest);
 | **[Architecture](docs/architecture.md)** | Module boundaries, container hierarchy, and request lifecycle |
 | **[Use Cases](docs/use-cases/README.md)** | Web APIs, admin panels, plugin systems, and microservices |
 | **[API Reference](docs/api-reference.md)** | Complete interface and class documentation |
-| **[Advanced Patterns](docs/advanced-patterns.md)** | Custom strategies, response decorators, and optimization |
+| **[Advanced Patterns](docs/advanced-patterns.md)** | Custom problem-details responses, response decorators, and advanced composition |
 
 ## Real-World Examples
 
@@ -204,18 +207,21 @@ Route::get('/profile', UserController::class)
     ->addResponseDecorator(fn(ResponseInterface $r) => $r->withHeader('X-Route', 'true'));
 ```
 
-### Configuration System
+### Default Setup
 ```php
-// config/modular_router.php
-<?php
+use Modular\Framework\App\ModularAppBuilder;
+use Modular\Router\PowerModule\Setup\RoutingSetup;
+use Modular\Router\RoutingModule;
+use Modular\Router\RouterModule;
 
-use Laminas\Diactoros\ResponseFactory;
-use Modular\Router\Config\Config;
-use Modular\Router\Config\Setting;
-use Modular\Router\Strategy\JsonRouterStrategy;
-
-return Config::create()
-    ->set(Setting::Strategy, new JsonRouterStrategy(new ResponseFactory()));
+$app = new ModularAppBuilder(__DIR__)
+    ->withPowerSetup(...RoutingSetup::withDefaults())
+    ->withModules(
+        RoutingModule::class,
+        RouterModule::class,
+        UserModule::class,
+    )
+    ->build();
 ```
 
 ## 🛠️ Development
@@ -238,11 +244,12 @@ make devcontainer # Build Docker development container
 
 ### Framework Dependencies
 - **Power Modules Framework**: Core module system and DI container
-- **Laminas Diactoros**: Default PSR-7 response implementation for native strategies
+- **Laminas Diactoros**: Default PSR-7 response implementation for synthetic responses and entrypoint exception middleware
 - **PSR-7/PSR-15**: HTTP message and middleware interfaces
 
 ### Extension Points
-- **Custom Strategies**: Replace default request/response handling
+- **Custom Synthetic Responses**: Replace default router-owned RFC 7807 response handling
+- **Custom Entrypoint Middleware**: Control exception-to-response policy in the composed HTTP entrypoint
 - **Response Decorators**: Global, module-level, and route-level response transformations
 - **Middleware Stacks**: Composable request/response processing
 - **Route Prefixes**: Custom URL organization patterns

@@ -175,7 +175,7 @@ class MonitoringModule implements PowerModule, HasRoutes, HasCustomRouteSlug
 }
 
 // Conditional loading
-$modules = [RouterModule::class, CoreModule::class];
+$modules = [RoutingModule::class, RouterModule::class, CoreModule::class];
 if ($env === 'development') {
     $modules[] = DevModule::class;
 }
@@ -184,7 +184,7 @@ if ($env === 'production') {
 }
 
 $app = new ModularAppBuilder(__DIR__)
-    ->withPowerSetup(new RoutingSetup())
+    ->withPowerSetup(...RoutingSetup::withDefaults())
     ->withModules(...$modules)
     ->build();
 ```
@@ -197,18 +197,19 @@ class UserModuleTest extends TestCase
     public function testUserRoutes()
     {
         $app = new ModularAppBuilder(__DIR__)
-            ->withPowerSetup(new RoutingSetup())
+            ->withPowerSetup(...RoutingSetup::withDefaults())
             ->withModules(
+                RoutingModule::class,
                 RouterModule::class,
                 UserModule::class,
                 MockDatabaseModule::class, // Mock dependencies
             )
             ->build();
         
-        $router = $app->get(ModularRouterInterface::class);
+        $httpEntrypoint = $app->get(\Modular\Router\Contract\HttpEntrypointInterface::class);
         
         $request = new ServerRequest('GET', '/user/profile');
-        $response = $router->handle($request);
+        $response = $httpEntrypoint->handle($request);
         
         $this->assertEquals(200, $response->getStatusCode());
     }
@@ -220,8 +221,9 @@ class UserOrderIntegrationTest extends TestCase
     public function testUserCanPlaceOrder()
     {
         $app = new ModularAppBuilder(__DIR__)
-            ->withPowerSetup(new RoutingSetup())
+            ->withPowerSetup(...RoutingSetup::withDefaults())
             ->withModules(
+                RoutingModule::class,
                 RouterModule::class,
                 UserModule::class,
                 OrderModule::class,
@@ -229,7 +231,7 @@ class UserOrderIntegrationTest extends TestCase
             )
             ->build();
         
-        $router = $app->get(ModularRouterInterface::class);
+        $httpEntrypoint = $app->get(\Modular\Router\Contract\HttpEntrypointInterface::class);
         
         // Test cross-module route interactions
         $loginRequest = new ServerRequest('POST', '/user/login');

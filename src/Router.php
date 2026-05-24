@@ -10,12 +10,12 @@ use Modular\Router\Contract\HasMiddleware;
 use Modular\Router\Contract\HasResponseDecorators;
 use Modular\Router\Contract\HasRoutes;
 use Modular\Router\Contract\ModularRouterInterface;
-use Modular\Router\Contract\RouterStrategyInterface;
+use Modular\Router\Contract\ResponseDecoratorChainInterface;
+use Modular\Router\Contract\SyntheticResponseFactoryInterface;
 use Psr\Container\ContainerInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\MiddlewareInterface;
-use Throwable;
 
 class Router implements ModularRouterInterface
 {
@@ -37,7 +37,8 @@ class Router implements ModularRouterInterface
     private ?CompiledRouteTable $compiledRouteTable = null;
 
     public function __construct(
-        private readonly RouterStrategyInterface $strategy,
+        private readonly SyntheticResponseFactoryInterface $syntheticResponseFactory,
+        private readonly ResponseDecoratorChainInterface $responseDecoratorChain,
     ) {
         $this->routeGroupPrefixResolver = new RouteGroupPrefixResolver();
         $this->routeCompiler = new RouteCompiler();
@@ -48,7 +49,7 @@ class Router implements ModularRouterInterface
 
     public function addResponseDecorator(callable $decorator): ModularRouterInterface
     {
-        $this->strategy->addResponseDecorator($decorator);
+        $this->responseDecoratorChain->addResponseDecorator($decorator);
 
         return $this;
     }
@@ -83,17 +84,7 @@ class Router implements ModularRouterInterface
     {
         $this->ensureCompiled();
 
-        try {
-            return $this->dispatch($request);
-        } catch (Throwable $throwable) {
-            $response = $this->strategy->createThrowableResponse($request, $throwable);
-
-            if ($response instanceof ResponseInterface) {
-                return $response;
-            }
-
-            throw $throwable;
-        }
+        return $this->dispatch($request);
     }
 
     /**
@@ -158,7 +149,9 @@ class Router implements ModularRouterInterface
         $modulePrefix = $compiledRouteTable->resolveModulePrefix($requestPath);
 
         if ($modulePrefix === null) {
-            return $this->strategy->createNotFoundResponse($request);
+            return $this->responseDecoratorChain->decorateResponse(
+                $this->syntheticResponseFactory->createNotFoundResponse($request),
+            );
         }
 
         $relativePath = $compiledRouteTable->toRelativePath($modulePrefix, $requestPath);
@@ -179,8 +172,12 @@ class Router implements ModularRouterInterface
             $allowedMethods = $this->allowedMethodsResolver->resolve($compiledRouteTable, $modulePrefix, $relativePath);
 
             return $allowedMethods === []
-                ? $this->strategy->createNotFoundResponse($request)
-                : $this->strategy->createOptionsResponse($request, $allowedMethods);
+                ? $this->responseDecoratorChain->decorateResponse(
+                    $this->syntheticResponseFactory->createNotFoundResponse($request),
+                )
+                : $this->responseDecoratorChain->decorateResponse(
+                    $this->syntheticResponseFactory->createOptionsResponse($request, $allowedMethods),
+                );
         }
 
         if ($requestMethod === RouteMethod::Head->value) {
@@ -225,16 +222,20 @@ class Router implements ModularRouterInterface
         $allowedMethods = $this->allowedMethodsResolver->resolve($compiledRouteTable, $modulePrefix, $relativePath);
 
         if ($allowedMethods !== []) {
-            return $this->strategy->createMethodNotAllowedResponse($request, $allowedMethods);
+            return $this->responseDecoratorChain->decorateResponse(
+                $this->syntheticResponseFactory->createMethodNotAllowedResponse($request, $allowedMethods),
+            );
         }
 
-        return $this->strategy->createNotFoundResponse($request);
+        return $this->responseDecoratorChain->decorateResponse(
+            $this->syntheticResponseFactory->createNotFoundResponse($request),
+        );
     }
 
     private function executeMatchedRoute(ServerRequestInterface $request, MatchedRoute $matchedRoute): ResponseInterface
     {
         $response = $this->middlewarePipeline->handle($request, $matchedRoute);
-        $response = $this->strategy->decorateResponse($response);
+        $response = $this->responseDecoratorChain->decorateResponse($response);
 
         foreach ($matchedRoute->route->orderedResponseDecorators as $responseDecorator) {
             $response = $responseDecorator($response);

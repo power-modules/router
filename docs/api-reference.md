@@ -146,9 +146,25 @@ Route::get('/profile', ShowUserProfileHandler::class)
 
 Handlers must implement `Psr\Http\Server\RequestHandlerInterface`.
 
-## Router Interface
+## HTTP Entrypoint Interface
 
-Main router interface for handling requests.
+Default composed HTTP entrypoint for applications.
+
+```php
+interface HttpEntrypointInterface extends RequestHandlerInterface
+{
+}
+```
+
+**Usage**:
+```php
+$httpEntrypoint = $app->get(HttpEntrypointInterface::class);
+$response = $httpEntrypoint->handle($serverRequest);
+```
+
+## Bare Router Interface
+
+Bare router service used for route registration, response decoration, and custom composition.
 
 ```php
 interface ModularRouterInterface extends RequestHandlerInterface
@@ -167,7 +183,7 @@ interface ModularRouterInterface extends RequestHandlerInterface
 
 **Usage**:
 ```php
-// Get router from DI container
+// Get the bare router from DI when you need advanced composition hooks
 $router = $app->get(ModularRouterInterface::class);
 
 // Add global response decorators programmatically
@@ -175,7 +191,7 @@ $router->addResponseDecorator(function (ResponseInterface $response): ResponseIn
     return $response->withHeader('X-API-Version', '1.0');
 });
 
-// Handle requests (typically done by HTTP server)
+// Handle requests directly only when you intentionally want the bare router
 $response = $router->handle($serverRequest);
 ```
 
@@ -183,33 +199,52 @@ $response = $router->handle($serverRequest);
 
 The router supports response decorators at three levels: global, module-level, and route-level. For detailed examples and execution order, see the [Response Decorators](advanced-patterns.md#response-decorators) section in the advanced patterns guide.
 
-## Configuration
+## Default Setup
 
-Configure the router via `config/modular_router.php`.
+Register `RoutingModule` and `RouterModule`, then use `RoutingSetup::withDefaults()` to compose the default RFC 7807 synthetic responses, global response decoration, entrypoint exception middleware, and route registration behavior.
 
 ```php
-enum Setting
-{
-    case Strategy; // RouterStrategyInterface implementation for request/response handling
-}
+use Modular\Framework\App\ModularAppBuilder;
+use Modular\Router\PowerModule\Setup\RoutingSetup;
+use Modular\Router\RoutingModule;
+use Modular\Router\RouterModule;
+
+$app = new ModularAppBuilder(__DIR__)
+    ->withPowerSetup(...RoutingSetup::withDefaults())
+    ->withModules(
+        RoutingModule::class,
+        RouterModule::class,
+        UserModule::class,
+        AdminModule::class,
+    )
+    ->build();
 ```
 
-**Configuration Examples**:
+## Manual Composition
+
+For advanced customization, compose the setup list manually and target another exporting module that provides `SyntheticResponseFactoryInterface`, `ResponseDecoratorChainInterface`, and `HttpEntrypointMiddlewareInterface`.
+
 ```php
-// config/modular_router.php - JSON API
-<?php
-use Laminas\Diactoros\ResponseFactory;
-use Modular\Router\Config\Config;
-use Modular\Router\Config\Setting;
-use Modular\Router\Strategy\JsonRouterStrategy;
+use Modular\Framework\App\ModularAppBuilder;
+use Modular\Router\PowerModule\Setup\HttpEntrypointMiddlewareSetup;
+use Modular\Router\PowerModule\Setup\ResponseDecoratorChainSetup;
+use Modular\Router\PowerModule\Setup\RoutingSetup;
+use Modular\Router\PowerModule\Setup\SyntheticResponseSetup;
+use Modular\Router\RouterModule;
 
-$strategy = new JsonRouterStrategy(new ResponseFactory());
-
-// Add global decorators directly to the strategy
-$strategy->addResponseDecorator(fn($r) => $r->withHeader('X-API-Version', '1.0'));
-
-return Config::create()
-    ->set(Setting::Strategy, $strategy);
+$app = new ModularAppBuilder(__DIR__)
+    ->withPowerSetup(
+        new HttpEntrypointMiddlewareSetup(ApiHttpModule::class),
+        new ResponseDecoratorChainSetup(ApiHttpModule::class),
+        new SyntheticResponseSetup(ApiHttpModule::class),
+        new RoutingSetup(),
+    )
+    ->withModules(
+        ApiHttpModule::class,
+        RouterModule::class,
+        UserModule::class,
+    )
+    ->build();
 ```
 
 ## Module Setup
@@ -222,7 +257,7 @@ class RouterModule implements PowerModule, ExportsComponents
 {
     public static function exports(): array
     {
-        return [ModularRouterInterface::class];
+        return [ModularRouterInterface::class, HttpEntrypointInterface::class];
     }
 }
 ```
@@ -232,8 +267,9 @@ Automatically discovers and registers routes from modules.
 
 ```php
 $app = new ModularAppBuilder(__DIR__)
-    ->withPowerSetup(new RoutingSetup()) // ← Enables automatic route discovery
+    ->withPowerSetup(...RoutingSetup::withDefaults()) // ← Enables automatic route discovery with the default routing composition
     ->withModules(
+        RoutingModule::class,
         RouterModule::class,
         UserModule::class,   // Routes: /user/*
         AdminModule::class,  // Routes: /admin/*
@@ -248,7 +284,7 @@ Controllers are resolved from their originating module's container, maintaining 
 - Uses fully qualified class names (e.g., `App\User\UserController`)
 - No naming conflicts between modules with different namespaces
 
-See [Controller Resolution Strategy](architecture.md#controller-resolution-strategy) for technical details.
+See [Controller Resolution Flow](architecture.md#controller-resolution-flow) for technical details.
 
 ## Middleware Resolution
 
@@ -273,6 +309,8 @@ Middleware classes are resolved with this precedence:
 ### HTTP Errors
 - **404 Not Found**: No matching route
 - **405 Method Not Allowed**: Route exists but wrong HTTP method
+- **Default payload contract**: Router-owned 404 and 405 responses, and the default unhandled 500 response, emit RFC 7807 problem-details JSON
+- **500+ Exception Responses**: Produced by the composed `HttpEntrypointInterface` via the configured `HttpEntrypointMiddlewareInterface`
 
 ## Route Prefix Rules
 - Must start with `/` (e.g., `/api/v1`, not `api/v1`)

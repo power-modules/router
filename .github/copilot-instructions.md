@@ -75,11 +75,14 @@ return [
 - **PHP CS Fixer**: PSR-12 + custom rules (trailing commas, ordered imports, no unused imports)
 - **PHPStan**: Level 8 analysis for maximum type safety
 
-## Configuration System
+## Setup System
 
-- **`Config\Config.php`**: Extends `PowerModuleConfig` with default `RouterStrategy`
-- **`Config\Setting.php`**: Enum-based configuration keys (`Setting::Strategy`)
-- Configuration filename: `modular_router`
+- **`RoutingModule.php`**: Exports the default RFC 7807 `SyntheticResponseFactoryInterface`, `ResponseDecoratorChainInterface`, and `HttpEntrypointMiddlewareInterface`
+- **`RouterModule.php`**: Exports the bare router and composed HTTP entrypoint services
+- **`PowerModule\Setup\RoutingSetup::withDefaults()`**: Returns the recommended default setup bundle
+- **`PowerModule\Setup\SyntheticResponseSetup.php`**: Advanced manual composition seam for targeting another exporting module
+- **`PowerModule\Setup\ResponseDecoratorChainSetup.php`**: Advanced manual composition seam for targeting another exporting module
+- **`PowerModule\Setup\HttpEntrypointMiddlewareSetup.php`**: Advanced manual composition seam for targeting another exporting module
 
 ## Integration Points
 
@@ -94,7 +97,9 @@ return [
 - Implement `HasResponseDecorators` for module-level response decorators
 - Use `addResponseDecorator()` on `Route` for route-level decorators
 - Use `addResponseDecorator()` on `Router` for global response decorators
-- Replace default `RouterStrategy` via config for custom response handling, including adding global decorators to the strategy instance.
+- Default router-owned 404 and 405 responses, and the default generic 500 response, use RFC 7807 problem-details JSON.
+- Use `RoutingSetup::withDefaults()` together with `RoutingModule` and `RouterModule` for the default setup path.
+- Compose `SyntheticResponseSetup`, `ResponseDecoratorChainSetup`, `HttpEntrypointMiddlewareSetup`, and `RoutingSetup` manually when another module should export custom synthetic responses, global decorators, or entrypoint middleware.
 
 ## Key Conventions
 

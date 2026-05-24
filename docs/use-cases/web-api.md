@@ -336,48 +336,36 @@ require_once __DIR__ . '/../vendor/autoload.php';
 use Laminas\Diactoros\ServerRequestFactory;
 use Laminas\HttpHandlerRunner\Emitter\SapiEmitter;
 use Modular\Framework\App\ModularAppBuilder;
-use Modular\Router\Contract\ModularRouterInterface;
+use Modular\Router\Contract\HttpEntrypointInterface;
 use Modular\Router\PowerModule\Setup\RoutingSetup;
+use Modular\Router\RoutingModule;
 use Modular\Router\RouterModule;
 
 // Build the modular application with router
 $app = new ModularAppBuilder(__DIR__ . '/..')
-    ->withPowerSetup(new RoutingSetup())  // Wires modules with HasRoutes automatically
+    ->withPowerSetup(...RoutingSetup::withDefaults())  // Wires modules with HasRoutes automatically and provides the default HTTP composition
     ->withModules(
-        RouterModule::class,  // Provides ModularRouterInterface
+        RoutingModule::class, // Provides RFC 7807 synthetic responses, global decorators, and entrypoint exception middleware
+        RouterModule::class,  // Provides the bare router plus the composed HTTP entrypoint
         AuthModule::class,    // Provides authentication services
         ApiModule::class,     // Implements HasRoutes with our API endpoints
     )
     ->build();
 
-// Get the router (configured with all module routes)
-$router = $app->get(ModularRouterInterface::class);
+// Get the composed HTTP entrypoint (configured with all module routes)
+$httpEntrypoint = $app->get(HttpEntrypointInterface::class);
 
 // Handle incoming HTTP request
 $request = ServerRequestFactory::fromGlobals();
-$response = $router->handle($request);
+$response = $httpEntrypoint->handle($request);
 
 // Emit response
 (new SapiEmitter())->emit($response);
 ```
 
-### 4. Optional: Router Configuration
+### 4. Optional: Custom Router Composition
 
-```php
-// config/modular_router.php
-<?php
-
-declare(strict_types=1);
-
-use Laminas\Diactoros\ResponseFactory;
-use Modular\Router\Config\Config;
-use Modular\Router\Config\Setting;
-use Modular\Router\Strategy\JsonRouterStrategy;
-
-// Use JSON strategy for automatic JSON responses
-return Config::create()
-    ->set(Setting::Strategy, new JsonRouterStrategy(new ResponseFactory()));
-```
+The default setup already returns RFC 7807 problem-details responses for router-owned errors and default unhandled exceptions. Compose the setup list manually with `SyntheticResponseSetup`, `ResponseDecoratorChainSetup`, `HttpEntrypointMiddlewareSetup`, and `RoutingSetup` only when you need richer problem types, extra fields, or custom exception policy.
 
 ## Key Features
 

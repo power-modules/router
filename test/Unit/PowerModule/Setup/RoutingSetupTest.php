@@ -11,12 +11,29 @@ use Modular\Framework\PowerModule\Contract\PowerModule;
 use Modular\Framework\PowerModule\Setup\PowerModuleSetupDto;
 use Modular\Framework\PowerModule\Setup\SetupPhase;
 use Modular\Router\Contract\ModularRouterInterface;
+use Modular\Router\PowerModule\Setup\HttpEntrypointMiddlewareSetup;
+use Modular\Router\PowerModule\Setup\ResponseDecoratorChainSetup;
 use Modular\Router\PowerModule\Setup\RoutingSetup;
+use Modular\Router\PowerModule\Setup\SyntheticResponseSetup;
+use Modular\Router\RoutingModule;
 use Modular\Router\Test\Unit\Sample\LibraryA\LibraryAModule;
 use PHPUnit\Framework\TestCase;
 
 class RoutingSetupTest extends TestCase
 {
+    public function testWithDefaultsReturnsExpectedSetupBundle(): void
+    {
+        self::assertEquals(
+            [
+                new HttpEntrypointMiddlewareSetup(RoutingModule::class),
+                new ResponseDecoratorChainSetup(RoutingModule::class),
+                new SyntheticResponseSetup(RoutingModule::class),
+                new RoutingSetup(),
+            ],
+            RoutingSetup::withDefaults(),
+        );
+    }
+
     public function testSetupRegistersCorrectModuleRoutes(): void
     {
         $router = $this->createMock(ModularRouterInterface::class);

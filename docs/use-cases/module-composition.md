@@ -382,10 +382,14 @@ final readonly class EnvironmentModuleLoader
 // Bootstrap application with environment-specific modules
 $env = $_ENV['APP_ENV'] ?? 'development';
 $loader = new EnvironmentModuleLoader();
-$modules = $loader->getModulesForEnvironment($env);
+$modules = [
+    RoutingModule::class,
+    RouterModule::class,
+    ...$loader->getModulesForEnvironment($env),
+];
 
 $app = new ModularAppBuilder(__DIR__)
-    ->withPowerSetup(new RoutingSetup())
+    ->withPowerSetup(...RoutingSetup::withDefaults())
     ->withModules(...$modules)
     ->build();
 ```
@@ -416,8 +420,9 @@ class ModuleCompositionTest extends TestCase
     public function testModuleDependencies(): void
     {
         $app = new ModularAppBuilder(__DIR__)
-            ->withPowerSetup(new RoutingSetup())
+            ->withPowerSetup(...RoutingSetup::withDefaults())
             ->withModules(
+                RoutingModule::class,
                 RouterModule::class,
                 DatabaseModule::class,
                 UserModule::class,
@@ -425,7 +430,7 @@ class ModuleCompositionTest extends TestCase
             )
             ->build();
         
-        $router = $app->get(ModularRouterInterface::class);
+        $httpEntrypoint = $app->get(\Modular\Router\Contract\HttpEntrypointInterface::class);
         
         // Test that order creation can access user services
         $request = new ServerRequest('POST', '/orders', [], json_encode([
@@ -433,7 +438,7 @@ class ModuleCompositionTest extends TestCase
             'items' => [['product' => 'widget', 'quantity' => 2]]
         ]));
         
-        $response = $router->handle($request);
+        $response = $httpEntrypoint->handle($request);
         $this->assertEquals(201, $response->getStatusCode());
     }
 }
@@ -453,7 +458,7 @@ class ModuleCompositionTest extends TestCase
 - Domain modules contain business logic
 - API modules aggregate domain services
 
-### Versioning Strategy
+### Versioning Approach
 - Separate modules for different API versions
 - Share domain modules across API versions
 - Use custom route slugs for version prefixes

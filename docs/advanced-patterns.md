@@ -10,7 +10,7 @@ Response decorators allow you to transform `ResponseInterface` objects at differ
 
 Global decorators are applied to every response handled by the router. They are ideal for cross-cutting concerns like adding security headers, API versioning, or performance metrics.
 
-There are two ways to add global decorators: programmatically via the router interface or declaratively via the configuration file.
+There are two ways to add global decorators: programmatically via the router interface or by exporting a preconfigured response decorator chain from a dedicated module.
 
 #### Programmatic Registration
 
@@ -27,29 +27,71 @@ $router->addResponseDecorator(function (ResponseInterface $response): ResponseIn
 });
 ```
 
-#### Configuration-Based Registration
+#### Module-Based Registration
 
-For static, application-wide decorators, adding them via the configuration is a cleaner approach. You can instantiate a strategy, add decorators to it, and then provide it to the router.
+For static, application-wide decorators, export a preconfigured response decorator chain from a dedicated module and point the setup bundle at that module.
 
 ```php
-// config/modular_router.php
-use Laminas\Diactoros\ResponseFactory;
-use Modular\Router\Config\Config;
-use Modular\Router\Config\Setting;
-use Modular\Router\Strategy\JsonRouterStrategy;
+use Modular\Framework\Container\ConfigurableContainerInterface;
+use Modular\Framework\PowerModule\Contract\ExportsComponents;
+use Modular\Framework\PowerModule\Contract\PowerModule;
+use Modular\Router\Contract\HttpEntrypointMiddlewareInterface;
+use Modular\Router\Contract\ResponseDecoratorChainInterface;
+use Modular\Router\Contract\SyntheticResponseFactoryInterface;
+use Modular\Router\ExceptionHandlingMiddleware;
+use Modular\Router\Response\ResponseDecoratorChain;
+use Modular\Router\Response\SyntheticResponseFactory;
 use Psr\Http\Message\ResponseInterface;
 
-$strategy = new JsonRouterStrategy(new ResponseFactory());
+final class ApiHttpModule implements PowerModule, ExportsComponents
+{
+    public static function exports(): array
+    {
+        return [
+            SyntheticResponseFactoryInterface::class,
+            ResponseDecoratorChainInterface::class,
+            HttpEntrypointMiddlewareInterface::class,
+        ];
+    }
 
-// Add global decorators directly to the strategy
-$strategy->addResponseDecorator(fn(ResponseInterface $r): ResponseInterface => $r->withHeader('X-API-Version', '1.0'));
-$strategy->addResponseDecorator(fn(ResponseInterface $r): ResponseInterface => $r->withHeader('X-Powered-By', 'Power-Modules'));
+    public function register(ConfigurableContainerInterface $container): void
+    {
+        $responseDecoratorChain = new ResponseDecoratorChain();
+        $responseDecoratorChain->addResponseDecorator(fn(ResponseInterface $r): ResponseInterface => $r->withHeader('X-API-Version', '1.0'));
+        $responseDecoratorChain->addResponseDecorator(fn(ResponseInterface $r): ResponseInterface => $r->withHeader('X-Powered-By', 'Power-Modules'));
 
-return Config::create()
-    ->set(Setting::Strategy, $strategy);
+        $container->set(SyntheticResponseFactoryInterface::class, SyntheticResponseFactory::class);
+        $container->set(ResponseDecoratorChainInterface::class, $responseDecoratorChain);
+        $container->set(HttpEntrypointMiddlewareInterface::class, ExceptionHandlingMiddleware::class)
+            ->addArguments([ResponseDecoratorChainInterface::class]);
+    }
+}
 ```
 
-> **Note:** For a cleaner and more reusable approach, you can also encapsulate global decorators within a custom strategy class. See [Custom Strategy with Pre-configured Decorators](#custom-strategy-with-pre-configured-decorators) for details.
+```php
+use Modular\Framework\App\ModularAppBuilder;
+use Modular\Router\PowerModule\Setup\HttpEntrypointMiddlewareSetup;
+use Modular\Router\PowerModule\Setup\ResponseDecoratorChainSetup;
+use Modular\Router\PowerModule\Setup\RoutingSetup;
+use Modular\Router\PowerModule\Setup\SyntheticResponseSetup;
+use Modular\Router\RouterModule;
+
+$app = new ModularAppBuilder(__DIR__)
+    ->withPowerSetup(
+        new HttpEntrypointMiddlewareSetup(ApiHttpModule::class),
+        new ResponseDecoratorChainSetup(ApiHttpModule::class),
+        new SyntheticResponseSetup(ApiHttpModule::class),
+        new RoutingSetup(),
+    )
+    ->withModules(
+        ApiHttpModule::class,
+        RouterModule::class,
+        UserApiModule::class,
+    )
+    ->build();
+```
+
+> **Note:** Global decorators apply to matched route responses, router-owned synthetic responses, and exception responses. Module-level and route-level decorators still apply only to matched route responses.
 
 ### Module-Level Decorators
 
@@ -102,83 +144,212 @@ Decorators are executed in an "inside-out" order, allowing for predictable respo
 
 This order means that route-specific decorators can act on a response that has already been modified by global and module-level decorators, giving them the final say on the response content and headers.
 
-## Custom Router Strategies
+Synthetic responses such as 404, 405, and synthetic OPTIONS responses receive only global decorators, because there is no matched module or route for module-level or route-level decorators to run against.
 
-Override the default strategy for specialized routing behavior:
+## Custom Synthetic Responses
 
-```php
-// config/modular_router.php
-use Laminas\Diactoros\ResponseFactory;
-use Modular\Router\Config\Config;
-use Modular\Router\Config\Setting;
-use Modular\Router\Strategy\JsonRouterStrategy;
+Override the default synthetic response factory by exporting your own implementation from a dedicated module and wiring `SyntheticResponseSetup` to that module.
 
-return Config::create()
-    ->set(Setting::Strategy, new JsonRouterStrategy(new ResponseFactory()));
-```
+### Custom Synthetic Response Factory
 
-### Custom Strategy with Pre-configured Decorators
+For an API-first application, you can create a custom synthetic response factory class that extends the default RFC 7807 implementation and customizes router-owned problem details in one place.
 
-For an even cleaner and more reusable approach, you can create a custom strategy class that extends one of the base strategies and adds your global decorators within its constructor. This encapsulates your application's default response policies in a single, testable class.
-
-First, define your custom strategy:
+First, define your custom synthetic response factory:
 
 ```php
-// src/Http/Strategy/MyApiStrategy.php
-namespace MyApp\Http\Strategy;
+// src/Http/Response/MyApiSyntheticResponseFactory.php
+namespace MyApp\Http\Response;
 
 use Laminas\Diactoros\ResponseFactory;
-use Modular\Router\Strategy\JsonRouterStrategy;
+use Modular\Router\Response\SyntheticResponseFactory;
 use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
 
-class MyApiStrategy extends JsonRouterStrategy
+class MyApiSyntheticResponseFactory extends SyntheticResponseFactory
 {
     public function __construct()
     {
-        // Parent constructor requires a response factory
         parent::__construct(new ResponseFactory());
-
-        // Add your global decorators here
-        $this->addResponseDecorator(
-            fn(ResponseInterface $r): ResponseInterface => $r->withHeader('X-API-Version', '1.0')
-        );
-        $this->addResponseDecorator(
-            fn(ResponseInterface $r): ResponseInterface => $r->withHeader('X-Powered-By', 'MyApp')
-        );
     }
-}
-```
 
-Then, register it in your configuration:
-
-```php
-// config/modular_router.php
-use Modular\Router\Config\Config;
-use Modular\Router\Config\Setting;
-use MyApp\Http\Strategy\MyApiStrategy;
-
-return Config::create()
-    ->set(Setting::Strategy, new MyApiStrategy());
-```
-
-This pattern keeps your configuration file minimal and centralizes your global response logic.
-
-### Custom Strategy for Plain Responses
-
-```php
-use Modular\Router\Strategy\RouterStrategy;
-use Psr\Http\Message\ResponseInterface;
-
-class ApiStrategy extends RouterStrategy
-{
-    public function decorateResponse(ResponseInterface $response): ResponseInterface
+    public function createNotFoundResponse(ServerRequestInterface $request): ResponseInterface
     {
-        return parent::decorateResponse($response)
-            ->withHeader('Content-Type', 'application/json')
-            ->withHeader('X-API-Framework', 'Power-Modules');
+        $response = parent::createNotFoundResponse($request);
+        $payload = json_decode((string) $response->getBody(), true, flags: JSON_THROW_ON_ERROR);
+
+        $payload['type'] = 'https://example.com/problems/not-found';
+
+        $rewritten = $response->withBody(new \Laminas\Diactoros\Stream('php://temp', 'wb+'));
+        $rewritten->getBody()->write((string) json_encode($payload, JSON_THROW_ON_ERROR));
+        $rewritten->getBody()->rewind();
+
+        return $rewritten;
     }
 }
 ```
+
+Then, export it from a dedicated module:
+
+```php
+use Modular\Framework\Container\ConfigurableContainerInterface;
+use Modular\Framework\PowerModule\Contract\ExportsComponents;
+use Modular\Framework\PowerModule\Contract\PowerModule;
+use Modular\Router\Contract\HttpEntrypointMiddlewareInterface;
+use Modular\Router\Contract\ResponseDecoratorChainInterface;
+use Modular\Router\Contract\SyntheticResponseFactoryInterface;
+use Modular\Router\ExceptionHandlingMiddleware;
+use Modular\Router\Response\ResponseDecoratorChain;
+use MyApp\Http\Response\MyApiSyntheticResponseFactory;
+
+final class MyApiHttpModule implements PowerModule, ExportsComponents
+{
+    public static function exports(): array
+    {
+        return [
+            SyntheticResponseFactoryInterface::class,
+            ResponseDecoratorChainInterface::class,
+            HttpEntrypointMiddlewareInterface::class,
+        ];
+    }
+
+    public function register(ConfigurableContainerInterface $container): void
+    {
+        $container->set(SyntheticResponseFactoryInterface::class, new MyApiSyntheticResponseFactory());
+        $container->set(ResponseDecoratorChainInterface::class, ResponseDecoratorChain::class);
+        $container->set(HttpEntrypointMiddlewareInterface::class, ExceptionHandlingMiddleware::class)
+            ->addArguments([ResponseDecoratorChainInterface::class]);
+    }
+}
+```
+
+Then compose the router setups manually for that module:
+
+```php
+$app = new ModularAppBuilder(__DIR__)
+    ->withPowerSetup(
+        new HttpEntrypointMiddlewareSetup(MyApiHttpModule::class),
+        new ResponseDecoratorChainSetup(MyApiHttpModule::class),
+        new SyntheticResponseSetup(MyApiHttpModule::class),
+        new RoutingSetup(),
+    )
+    ->withModules(
+        MyApiHttpModule::class,
+        RouterModule::class,
+        UserApiModule::class,
+    )
+    ->build();
+```
+
+This pattern keeps the custom composition in module wiring and centralizes your global response logic.
+
+### Custom Problem Types
+
+```php
+use Modular\Router\Response\SyntheticResponseFactory;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
+
+class ApiSyntheticResponseFactory extends SyntheticResponseFactory
+{
+    public function createMethodNotAllowedResponse(ServerRequestInterface $request, array $allowedMethods): ResponseInterface
+    {
+        $response = parent::createMethodNotAllowedResponse($request, $allowedMethods);
+        $payload = json_decode((string) $response->getBody(), true, flags: JSON_THROW_ON_ERROR);
+
+        $payload['type'] = 'https://example.com/problems/method-not-allowed';
+
+        $rewritten = $response->withBody(new \Laminas\Diactoros\Stream('php://temp', 'wb+'));
+        $rewritten->getBody()->write((string) json_encode($payload, JSON_THROW_ON_ERROR));
+        $rewritten->getBody()->rewind();
+
+        return $rewritten;
+    }
+}
+```
+
+## Custom Entrypoint Middleware
+
+Exception handling lives outside the bare router in the composed HTTP entrypoint. Customize exception policy by exporting an `HttpEntrypointMiddlewareInterface` implementation from a dedicated module and wiring `HttpEntrypointMiddlewareSetup` to that module.
+
+```php
+use Laminas\Diactoros\ResponseFactory;
+use Modular\Framework\Container\ConfigurableContainerInterface;
+use Modular\Framework\PowerModule\Contract\ExportsComponents;
+use Modular\Framework\PowerModule\Contract\PowerModule;
+use Modular\Router\Contract\HttpEntrypointMiddlewareInterface;
+use Modular\Router\Contract\ResponseDecoratorChainInterface;
+use Modular\Router\Contract\SyntheticResponseFactoryInterface;
+use Modular\Router\Response\ResponseDecoratorChain;
+use Modular\Router\Response\SyntheticResponseFactory;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Server\RequestHandlerInterface;
+use Throwable;
+
+final class ProblemDetailsHttpModule implements PowerModule, ExportsComponents
+{
+    public static function exports(): array
+    {
+        return [
+            SyntheticResponseFactoryInterface::class,
+            ResponseDecoratorChainInterface::class,
+            HttpEntrypointMiddlewareInterface::class,
+        ];
+    }
+
+    public function register(ConfigurableContainerInterface $container): void
+    {
+        $container->set(SyntheticResponseFactoryInterface::class, SyntheticResponseFactory::class);
+        $container->set(ResponseDecoratorChainInterface::class, ResponseDecoratorChain::class);
+        $container->set(HttpEntrypointMiddlewareInterface::class, new class () implements HttpEntrypointMiddlewareInterface {
+            private readonly ResponseFactory $responseFactory;
+
+            public function __construct()
+            {
+                $this->responseFactory = new ResponseFactory();
+            }
+
+            public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
+            {
+                try {
+                    return $handler->handle($request);
+                } catch (Throwable $throwable) {
+                    $response = $this->responseFactory
+                        ->createResponse(500, 'Internal Server Error')
+                        ->withHeader('Content-Type', 'application/problem+json');
+
+                    $response->getBody()->write((string) json_encode([
+                        'type' => 'https://example.com/problems/internal-server-error',
+                        'title' => 'Internal Server Error',
+                        'status' => 500,
+                        'detail' => 'Please contact support if the problem persists.',
+                    ], JSON_THROW_ON_ERROR));
+
+                    return $response;
+                }
+            }
+        });
+    }
+}
+```
+
+```php
+$app = new ModularAppBuilder(__DIR__)
+    ->withPowerSetup(
+        new HttpEntrypointMiddlewareSetup(ProblemDetailsHttpModule::class),
+        new ResponseDecoratorChainSetup(ProblemDetailsHttpModule::class),
+        new SyntheticResponseSetup(ProblemDetailsHttpModule::class),
+        new RoutingSetup(),
+    )
+    ->withModules(
+        ProblemDetailsHttpModule::class,
+        RouterModule::class,
+        UserApiModule::class,
+    )
+    ->build();
+```
+
+The default router already emits RFC 7807 responses. Override the entrypoint middleware only when you want richer problem types or additional fields.
 
 ## Route Organization
 
@@ -363,14 +534,14 @@ class RouteTest extends TestCase
     public function testUserRoutes(): void
     {
         $app = new ModularAppBuilder(__DIR__)
-            ->withPowerSetup(new RoutingSetup())
-            ->withModules(RouterModule::class, UserModule::class)
+            ->withPowerSetup(...RoutingSetup::withDefaults())
+            ->withModules(RoutingModule::class, RouterModule::class, UserModule::class)
             ->build();
         
-        $router = $app->get(ModularRouterInterface::class);
+        $httpEntrypoint = $app->get(\Modular\Router\Contract\HttpEntrypointInterface::class);
         
         $request = new ServerRequest('GET', '/user/profile');
-        $response = $router->handle($request);
+        $response = $httpEntrypoint->handle($request);
         
         $this->assertEquals(200, $response->getStatusCode());
     }

@@ -1,10 +1,13 @@
-.PHONY: test codestyle phpstan devcontainer
+.PHONY: test codestyle phpstan devcontainer fix-codestyle
 
 test:
 	vendor/bin/phpunit --color=always --no-coverage --display-all-issues test/
 
 codestyle:
 	vendor/bin/php-cs-fixer check --config=.php-cs-fixer.php .
+
+fix-codestyle:
+	vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.php .
 
 phpstan:
 	vendor/bin/phpstan analyse --memory-limit=4G --configuration=phpstan.neon --no-progress --no-interaction src/ test/

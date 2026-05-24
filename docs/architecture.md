@@ -63,15 +63,16 @@ The native router keeps router services in the application container while prese
 Application Container
 ├── RouterModule Services
 │   ├── ModularRouterInterface
+│   ├── HttpEntrypointInterface
 │   ├── RouteCompiler / RouteMatcher
-│   └── Router Strategy Configuration
+│   └── Routing Response Factory / Throwable Mapper Configuration
 └── Module Containers
     ├── UserModule Container
     ├── AdminModule Container
     └── ApiModule Container
 ```
 
-### Handler Resolution Strategy
+### Handler Resolution Flow
 
 Handlers are resolved from the originating module container during dispatch:
 
@@ -186,7 +187,7 @@ Complex routing behavior emerges from simple, composable pieces:
 - **Module Interfaces**: Single-purpose contracts (`HasRoutes`, `HasMiddleware`)
 - **Middleware Stacking**: Layered concerns without coupling
 - **Response Decorators**: Global transformations without modification
-- **Strategy Pattern**: Pluggable routing strategies
+- **Explicit Composition**: Pluggable synthetic response factories and entrypoint middleware
 
 ## Architectural Benefits
 
@@ -202,17 +203,17 @@ Complex routing behavior emerges from simple, composable pieces:
 - **API Versioning**: Multiple API modules can coexist
 - **Migration Paths**: Legacy and new systems can run side-by-side
 
-### Testing Strategy
+### Testing Approach
 - **Unit Testing**: Test modules in complete isolation
 - **Integration Testing**: Verify module interactions through HTTP
 - **Contract Testing**: Ensure interface compliance
 - **End-to-End Testing**: Full request/response cycles
 
-## Controller Resolution Strategy
+## Controller Resolution Flow
 
 ### How Controllers Are Resolved
 
-The router uses a sophisticated controller resolution strategy that maintains module encapsulation:
+The router uses a controller resolution flow that maintains module encapsulation:
 
 **Registration Process**:
 1. Controllers are registered using their **fully qualified class name** (e.g., `App\User\UserController`)
@@ -262,13 +263,19 @@ Module registration order has minimal impact:
 
 The router's behavior can be customized through several key extension points, allowing for advanced and specialized use cases.
 
-### Custom Strategies
+### Custom Synthetic Responses And Entrypoint Middleware
 
-Replace the default League/Route strategy to implement specialized behavior for your entire application. This is ideal for:
-- JSON-first APIs
-- GraphQL endpoints
-- Custom authentication flows
-- Specialized error handling
+Replace the default synthetic response factory when you want to customize router-owned RFC 7807 responses for your entire application. This is ideal for:
+- custom problem `type` URIs
+- richer 404 and 405 payloads
+- additional problem metadata on router-owned errors
+- alternate OPTIONS response policies
+
+Replace the default entrypoint middleware when you want to customize application exception policy. This is ideal for:
+- domain exception mapping
+- richer RFC 7807 responses with `detail` or `instance`
+- environment-specific 500 behavior
+- consistent application-specific problem types
 
 ### Response Decorators
 

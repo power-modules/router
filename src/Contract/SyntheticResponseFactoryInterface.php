@@ -6,17 +6,9 @@ namespace Modular\Router\Contract;
 
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
-use Throwable;
 
-interface RouterStrategyInterface
+interface SyntheticResponseFactoryInterface
 {
-    /**
-     * @param callable(ResponseInterface):ResponseInterface $decorator
-     */
-    public function addResponseDecorator(callable $decorator): static;
-
-    public function decorateResponse(ResponseInterface $response): ResponseInterface;
-
     /**
      * @param list<string> $allowedMethods
      */
@@ -28,6 +20,4 @@ interface RouterStrategyInterface
     public function createMethodNotAllowedResponse(ServerRequestInterface $request, array $allowedMethods): ResponseInterface;
 
     public function createNotFoundResponse(ServerRequestInterface $request): ResponseInterface;
-
-    public function createThrowableResponse(ServerRequestInterface $request, Throwable $throwable): ?ResponseInterface;
 }

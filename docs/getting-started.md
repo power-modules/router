@@ -31,8 +31,9 @@ use Modular\Framework\App\ModularAppBuilder;
 use Modular\Framework\PowerModule\Contract\PowerModule;
 use Modular\Framework\Container\ConfigurableContainerInterface;
 use Modular\Router\Contract\HasRoutes;
-use Modular\Router\Contract\ModularRouterInterface;
+use Modular\Router\Contract\HttpEntrypointInterface;
 use Modular\Router\Route;
+use Modular\Router\RoutingModule;
 use Modular\Router\RouterModule;
 use Modular\Router\PowerModule\Setup\RoutingSetup;
 use Psr\Http\Message\ResponseInterface;
@@ -69,21 +70,22 @@ final readonly class HealthModule implements PowerModule, HasRoutes
 
 // Build and use the application
 $app = new ModularAppBuilder(__DIR__)
-    ->withPowerSetup(new RoutingSetup())  // Enables automatic route discovery
+    ->withPowerSetup(...RoutingSetup::withDefaults())  // Enables automatic route discovery with default router composition
     ->withModules(
-        RouterModule::class,  // Provides the router service
+        RoutingModule::class, // Provides RFC 7807 synthetic responses, global decorators, and entrypoint exception middleware
+        RouterModule::class,  // Provides the bare router and composed HTTP entrypoint
         HealthModule::class,  // Your module with routes
     )
     ->build();
 
-// Get the router and handle a request
-$router = $app->get(ModularRouterInterface::class);
+// Get the composed HTTP entrypoint and handle a request
+$httpEntrypoint = $app->get(HttpEntrypointInterface::class);
 
 // Example request (in real app, use ServerRequestFactory::fromGlobals())
 $request = (new Laminas\Diactoros\ServerRequestFactory())
     ->createServerRequest('GET', '/health/status');
 
-$response = $router->handle($request);
+$response = $httpEntrypoint->handle($request);
 
 // Emit the response
 (new Laminas\HttpHandlerRunner\Emitter\SapiEmitter())->emit($response);
