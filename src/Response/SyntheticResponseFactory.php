@@ -57,6 +57,9 @@ class SyntheticResponseFactory implements SyntheticResponseFactoryInterface
         return $response->withHeader('Allow', implode(', ', $allowedMethods));
     }
 
+    /**
+     * @return array<string, int|string>
+     */
     protected function createNotFoundPayload(ServerRequestInterface $request): array
     {
         return $this->problemDetailsPayloadFactory->createPayload(404, 'Not Found');
@@ -64,12 +67,16 @@ class SyntheticResponseFactory implements SyntheticResponseFactoryInterface
 
     /**
      * @param list<string> $allowedMethods
+     * @return array<string, int|string>
      */
     protected function createMethodNotAllowedPayload(ServerRequestInterface $request, array $allowedMethods): array
     {
         return $this->problemDetailsPayloadFactory->createPayload(405, 'Method Not Allowed');
     }
 
+    /**
+     * @param array<string, int|string> $payload
+     */
     protected function createProblemDetailsResponse(int $statusCode, string $title, array $payload): ResponseInterface
     {
         $response = $this->responseFactory

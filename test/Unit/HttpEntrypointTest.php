@@ -192,6 +192,9 @@ final class HttpEntrypointTest extends TestCase
             $responseDecoratorChain,
             new ResponseFactory(),
             new class () extends ProblemDetailsPayloadFactory {
+                /**
+                 * @return array<string, int|string>
+                 */
                 public function createPayload(int $statusCode, string $title, string $type = 'about:blank'): array
                 {
                     return [

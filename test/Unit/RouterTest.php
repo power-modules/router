@@ -305,6 +305,9 @@ class RouterTest extends TestCase
             new ConfigurableContainer(),
             [DispatchContractModule::class],
             new class (new ResponseFactory()) extends SyntheticResponseFactory {
+                /**
+                 * @return array<string, int|string>
+                 */
                 protected function createNotFoundPayload(ServerRequestInterface $request): array
                 {
                     return [
@@ -314,6 +317,9 @@ class RouterTest extends TestCase
                     ];
                 }
 
+                /**
+                 * @return array<string, int|string>
+                 */
                 protected function createMethodNotAllowedPayload(ServerRequestInterface $request, array $allowedMethods): array
                 {
                     return [
