@@ -15,6 +15,7 @@ use Modular\Router\Contract\ResponseDecoratorChainInterface;
 use Modular\Router\Contract\SyntheticResponseFactoryInterface;
 use Modular\Router\ExceptionHandlingMiddleware;
 use Modular\Router\HttpEntrypoint;
+use Modular\Router\Response\ProblemDetailsPayloadFactory;
 use Modular\Router\Response\ResponseDecoratorChain;
 use Modular\Router\Response\SyntheticResponseFactory;
 use Modular\Router\Router;
@@ -31,6 +32,7 @@ use Throwable;
 
 #[CoversClass(HttpEntrypoint::class)]
 #[CoversClass(ExceptionHandlingMiddleware::class)]
+#[CoversClass(ProblemDetailsPayloadFactory::class)]
 final class HttpEntrypointTest extends TestCase
 {
     public function testEntrypointMapsControllerExceptionsWithDefaultProblemDetailsMiddleware(): void
@@ -177,6 +179,51 @@ final class HttpEntrypointTest extends TestCase
                 'status' => 500,
             ],
             json_decode((string) $unknownResponse->getBody(), true),
+        );
+    }
+
+    public function testExceptionHandlingMiddlewareCanUseCustomProblemDetailsPayloadFactory(): void
+    {
+        $responseDecoratorChain = new ResponseDecoratorChain();
+        $responseDecoratorChain->addResponseDecorator(
+            static fn (ResponseInterface $response): ResponseInterface => $response->withHeader('X-Global-Decorator', 'true'),
+        );
+        $middleware = new ExceptionHandlingMiddleware(
+            $responseDecoratorChain,
+            new ResponseFactory(),
+            new class () extends ProblemDetailsPayloadFactory {
+                public function createPayload(int $statusCode, string $title, string $type = 'about:blank'): array
+                {
+                    return [
+                        ...parent::createPayload($statusCode, $title, 'https://example.com/problems/internal-server-error'),
+                        'type' => 'https://example.com/problems/internal-server-error',
+                        'detail' => 'Please contact support if the problem persists.',
+                    ];
+                }
+            },
+        );
+
+        $response = $middleware->process(
+            $this->getRequest('/boom'),
+            new class () implements RequestHandlerInterface {
+                public function handle(ServerRequestInterface $request): ResponseInterface
+                {
+                    throw new \RuntimeException('boom');
+                }
+            },
+        );
+
+        self::assertSame(500, $response->getStatusCode());
+        self::assertSame('application/problem+json', $response->getHeaderLine('Content-Type'));
+        self::assertSame('true', $response->getHeaderLine('X-Global-Decorator'));
+        self::assertSame(
+            [
+                'type' => 'https://example.com/problems/internal-server-error',
+                'title' => 'Internal Server Error',
+                'status' => 500,
+                'detail' => 'Please contact support if the problem persists.',
+            ],
+            json_decode((string) $response->getBody(), true),
         );
     }
 

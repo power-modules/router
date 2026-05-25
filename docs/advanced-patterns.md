@@ -150,6 +150,8 @@ Synthetic responses such as 404, 405, and synthetic OPTIONS responses receive on
 
 Override the default synthetic response factory by exporting your own implementation from a dedicated module and wiring `SyntheticResponseSetup` to that module.
 
+Custom synthetic responses are optional. They affect only router-owned responses such as 404, 405, and synthetic OPTIONS results. Application exception policy still lives in `HttpEntrypointMiddlewareInterface`.
+
 ### Custom Synthetic Response Factory
 
 For an API-first application, you can create a custom synthetic response factory class that extends the default RFC 7807 implementation and customizes router-owned problem details in one place.
@@ -162,7 +164,6 @@ namespace MyApp\Http\Response;
 
 use Laminas\Diactoros\ResponseFactory;
 use Modular\Router\Response\SyntheticResponseFactory;
-use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
 class MyApiSyntheticResponseFactory extends SyntheticResponseFactory
@@ -172,18 +173,13 @@ class MyApiSyntheticResponseFactory extends SyntheticResponseFactory
         parent::__construct(new ResponseFactory());
     }
 
-    public function createNotFoundResponse(ServerRequestInterface $request): ResponseInterface
+    protected function createNotFoundPayload(ServerRequestInterface $request): array
     {
-        $response = parent::createNotFoundResponse($request);
-        $payload = json_decode((string) $response->getBody(), true, flags: JSON_THROW_ON_ERROR);
-
-        $payload['type'] = 'https://example.com/problems/not-found';
-
-        $rewritten = $response->withBody(new \Laminas\Diactoros\Stream('php://temp', 'wb+'));
-        $rewritten->getBody()->write((string) json_encode($payload, JSON_THROW_ON_ERROR));
-        $rewritten->getBody()->rewind();
-
-        return $rewritten;
+        return [
+            ...parent::createNotFoundPayload($request),
+            'type' => 'https://example.com/problems/not-found',
+            'detail' => sprintf('No route matched %s', $request->getUri()->getPath()),
+        ];
     }
 }
 ```
@@ -246,23 +242,17 @@ This pattern keeps the custom composition in module wiring and centralizes your 
 
 ```php
 use Modular\Router\Response\SyntheticResponseFactory;
-use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
 class ApiSyntheticResponseFactory extends SyntheticResponseFactory
 {
-    public function createMethodNotAllowedResponse(ServerRequestInterface $request, array $allowedMethods): ResponseInterface
+    protected function createMethodNotAllowedPayload(ServerRequestInterface $request, array $allowedMethods): array
     {
-        $response = parent::createMethodNotAllowedResponse($request, $allowedMethods);
-        $payload = json_decode((string) $response->getBody(), true, flags: JSON_THROW_ON_ERROR);
-
-        $payload['type'] = 'https://example.com/problems/method-not-allowed';
-
-        $rewritten = $response->withBody(new \Laminas\Diactoros\Stream('php://temp', 'wb+'));
-        $rewritten->getBody()->write((string) json_encode($payload, JSON_THROW_ON_ERROR));
-        $rewritten->getBody()->rewind();
-
-        return $rewritten;
+        return [
+            ...parent::createMethodNotAllowedPayload($request, $allowedMethods),
+            'type' => 'https://example.com/problems/method-not-allowed',
+            'detail' => sprintf('Allowed methods: %s', implode(', ', $allowedMethods)),
+        ];
     }
 }
 ```
@@ -270,6 +260,12 @@ class ApiSyntheticResponseFactory extends SyntheticResponseFactory
 ## Custom Entrypoint Middleware
 
 Exception handling lives outside the bare router in the composed HTTP entrypoint. Customize exception policy by exporting an `HttpEntrypointMiddlewareInterface` implementation from a dedicated module and wiring `HttpEntrypointMiddlewareSetup` to that module.
+
+This seam is where domain exceptions, app-specific problem types, and environment-specific 500 behavior belong. It does not replace the synthetic response factory for router-owned 404 or 405 responses.
+
+If you want the default synthetic response factory and the default exception middleware to emit the same custom problem-details payload shape, keep the default classes and pass the same `ProblemDetailsPayloadFactory` instance into both during manual composition. That narrows customization to payload formatting without replacing either behavior owner.
+
+The shared helper defaults the problem `type` to `about:blank`, but you can pass a different type into `createPayload()` when a caller already owns that policy decision.
 
 ```php
 use Laminas\Diactoros\ResponseFactory;

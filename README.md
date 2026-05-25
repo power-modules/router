@@ -37,7 +37,7 @@ use Modular\Router\PowerModule\Setup\RoutingSetup;
 $app = new ModularAppBuilder(__DIR__)
     ->withPowerSetup(...RoutingSetup::withDefaults())
     ->withModules(
-        RoutingModule::class,          // Provides RFC 7807 synthetic responses, global decorators, and entrypoint exception middleware
+        RoutingModule::class,          // Provides default synthetic responses, global decorators, and entrypoint middleware
         RouterModule::class,           // Provides routing infrastructure
         \MyApp\User\UserModule::class, // Your modules with routes
         \MyApp\Admin\AdminModule::class,
@@ -208,6 +208,11 @@ Route::get('/profile', UserController::class)
 ```
 
 ### Default Setup
+`RoutingSetup::withDefaults()` composes three distinct HTTP concerns:
+- router-owned synthetic responses for unmatched routes and unsupported methods
+- application-wide exception handling in the composed HTTP entrypoint
+- global response decoration shared by routed, synthetic, and exception responses
+
 ```php
 use Modular\Framework\App\ModularAppBuilder;
 use Modular\Router\PowerModule\Setup\RoutingSetup;
@@ -248,8 +253,8 @@ make devcontainer # Build Docker development container
 - **PSR-7/PSR-15**: HTTP message and middleware interfaces
 
 ### Extension Points
-- **Custom Synthetic Responses**: Replace default router-owned RFC 7807 response handling
-- **Custom Entrypoint Middleware**: Control exception-to-response policy in the composed HTTP entrypoint
+- **Custom Synthetic Responses**: Replace router-owned 404, 405, and synthetic OPTIONS responses when you want different payloads or headers for unmatched routes and unsupported methods
+- **Custom Entrypoint Middleware**: Control application exception-to-response policy in the composed HTTP entrypoint
 - **Response Decorators**: Global, module-level, and route-level response transformations
 - **Middleware Stacks**: Composable request/response processing
 - **Route Prefixes**: Custom URL organization patterns

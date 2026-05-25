@@ -299,6 +299,62 @@ class RouterTest extends TestCase
         self::assertSame('GET, HEAD, OPTIONS, POST', $response->getHeaderLine('Allow'));
     }
 
+    public function testSyntheticResponseFactorySubclassCanCustomizeProblemDetailsPayloads(): void
+    {
+        $router = $this->getRouter(
+            new ConfigurableContainer(),
+            [DispatchContractModule::class],
+            new class (new ResponseFactory()) extends SyntheticResponseFactory {
+                protected function createNotFoundPayload(ServerRequestInterface $request): array
+                {
+                    return [
+                        ...parent::createNotFoundPayload($request),
+                        'type' => 'https://example.com/problems/not-found',
+                        'detail' => sprintf('No route matched %s', $request->getUri()->getPath()),
+                    ];
+                }
+
+                protected function createMethodNotAllowedPayload(ServerRequestInterface $request, array $allowedMethods): array
+                {
+                    return [
+                        ...parent::createMethodNotAllowedPayload($request, $allowedMethods),
+                        'type' => 'https://example.com/problems/method-not-allowed',
+                        'detail' => sprintf('Allowed methods: %s', implode(', ', $allowedMethods)),
+                    ];
+                }
+            },
+        );
+        $router->addResponseDecorator(
+            static fn (\Psr\Http\Message\ResponseInterface $response): \Psr\Http\Message\ResponseInterface => $response->withHeader('X-Decorator-Order', trim($response->getHeaderLine('X-Decorator-Order') . ',global', ',')),
+        );
+
+        $notFoundResponse = $router->handle($this->getRequest('/dispatch-contract/missing'));
+        $methodNotAllowedResponse = $router->handle($this->getRequest('/dispatch-contract/method-check', 'PATCH'));
+
+        self::assertSame(
+            [
+                'type' => 'https://example.com/problems/not-found',
+                'title' => 'Not Found',
+                'status' => 404,
+                'detail' => 'No route matched /dispatch-contract/missing',
+            ],
+            json_decode((string) $notFoundResponse->getBody(), true),
+        );
+        self::assertSame('global', $notFoundResponse->getHeaderLine('X-Decorator-Order'));
+
+        self::assertSame(
+            [
+                'type' => 'https://example.com/problems/method-not-allowed',
+                'title' => 'Method Not Allowed',
+                'status' => 405,
+                'detail' => 'Allowed methods: GET, HEAD, OPTIONS, POST',
+            ],
+            json_decode((string) $methodNotAllowedResponse->getBody(), true),
+        );
+        self::assertSame('GET, HEAD, OPTIONS, POST', $methodNotAllowedResponse->getHeaderLine('Allow'));
+        self::assertSame('global', $methodNotAllowedResponse->getHeaderLine('X-Decorator-Order'));
+    }
+
     public function testRouterPropagatesInvalidResolvedHandlerExceptions(): void
     {
         $this->expectException(\InvalidArgumentException::class);
@@ -317,11 +373,14 @@ class RouterTest extends TestCase
     /**
      * @param array<class-string<PowerModule>> $modules
      */
-    private function getRouter(ConfigurableContainer $rootContainer, array $modules): ModularRouterInterface
-    {
+    private function getRouter(
+        ConfigurableContainer $rootContainer,
+        array $modules,
+        ?SyntheticResponseFactory $syntheticResponseFactory = null,
+    ): ModularRouterInterface {
         $responseDecoratorChain = new ResponseDecoratorChain();
         $router = new Router(
-            new SyntheticResponseFactory(new ResponseFactory()),
+            $syntheticResponseFactory ?? new SyntheticResponseFactory(new ResponseFactory()),
             $responseDecoratorChain,
         );
 

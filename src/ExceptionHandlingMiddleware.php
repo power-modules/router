@@ -7,6 +7,7 @@ namespace Modular\Router;
 use Laminas\Diactoros\ResponseFactory;
 use Modular\Router\Contract\HttpEntrypointMiddlewareInterface;
 use Modular\Router\Contract\ResponseDecoratorChainInterface;
+use Modular\Router\Response\ProblemDetailsPayloadFactory;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -15,15 +16,11 @@ use Throwable;
 
 class ExceptionHandlingMiddleware implements HttpEntrypointMiddlewareInterface
 {
-    private const DEFAULT_PROBLEM_TYPE = 'about:blank';
-
-    private readonly ResponseFactoryInterface $responseFactory;
-
     public function __construct(
         private readonly ResponseDecoratorChainInterface $responseDecoratorChain,
-        ?ResponseFactoryInterface $responseFactory = null,
+        private readonly ResponseFactoryInterface $responseFactory = new ResponseFactory(),
+        private readonly ProblemDetailsPayloadFactory $problemDetailsPayloadFactory = new ProblemDetailsPayloadFactory(),
     ) {
-        $this->responseFactory = $responseFactory ?? new ResponseFactory();
     }
 
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
@@ -39,15 +36,12 @@ class ExceptionHandlingMiddleware implements HttpEntrypointMiddlewareInterface
 
     private function createThrowableResponse(): ResponseInterface
     {
+        $payload = $this->problemDetailsPayloadFactory->createPayload(500, 'Internal Server Error');
         $response = $this->responseFactory
             ->createResponse(500, 'Internal Server Error')
             ->withHeader('Content-Type', 'application/problem+json');
 
-        $response->getBody()->write((string) json_encode([
-            'type' => self::DEFAULT_PROBLEM_TYPE,
-            'title' => 'Internal Server Error',
-            'status' => 500,
-        ], JSON_THROW_ON_ERROR));
+        $response->getBody()->write((string) json_encode($payload, JSON_THROW_ON_ERROR));
 
         return $response;
     }

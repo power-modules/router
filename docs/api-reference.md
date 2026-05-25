@@ -201,7 +201,9 @@ The router supports response decorators at three levels: global, module-level, a
 
 ## Default Setup
 
-Register `RoutingModule` and `RouterModule`, then use `RoutingSetup::withDefaults()` to compose the default RFC 7807 synthetic responses, global response decoration, entrypoint exception middleware, and route registration behavior.
+Register `RoutingModule` and `RouterModule`, then use `RoutingSetup::withDefaults()` to compose the default router-owned synthetic responses, global response decoration, entrypoint exception middleware, and route registration behavior.
+
+Use the synthetic response factory when you want to change router-generated 404, 405, or synthetic OPTIONS responses. Use the entrypoint middleware when you want to change how application exceptions become HTTP responses.
 
 ```php
 use Modular\Framework\App\ModularAppBuilder;
@@ -223,6 +225,15 @@ $app = new ModularAppBuilder(__DIR__)
 ## Manual Composition
 
 For advanced customization, compose the setup list manually and target another exporting module that provides `SyntheticResponseFactoryInterface`, `ResponseDecoratorChainInterface`, and `HttpEntrypointMiddlewareInterface`.
+
+These three seams stay separate on purpose:
+- `SyntheticResponseFactoryInterface` customizes router-owned terminal responses
+- `HttpEntrypointMiddlewareInterface` customizes exception policy for the composed HTTP entrypoint
+- `ResponseDecoratorChainInterface` applies global response transformations after either of the two paths above produces a response
+
+When you want the default synthetic response factory and the default exception middleware to share the same problem-details payload shape, compose both with the same `ProblemDetailsPayloadFactory` instance.
+
+`ProblemDetailsPayloadFactory::createPayload()` accepts an optional `$type` argument and defaults to `about:blank`, so callers can stay on the RFC 7807 default path unless they need a different problem type.
 
 ```php
 use Modular\Framework\App\ModularAppBuilder;
